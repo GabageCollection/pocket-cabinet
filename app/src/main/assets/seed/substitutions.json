@@ -1,0 +1,132 @@
+{
+  "version": "2026.09.05",
+  "substitutions": [
+    {
+      "from": "lime",
+      "to": "lemon",
+      "ratio": 0.8,
+      "flavor": "酸度略低，柑橘香更柔和",
+      "abvDelta": 0,
+      "methods": "全部方法",
+      "priority": 1
+    },
+    {
+      "from": "lime_cordial",
+      "to": "lime",
+      "ratio": 1,
+      "extra": {
+        "ing": "simple_syrup",
+        "qty": 10,
+        "unit": "ml"
+      },
+      "flavor": "更清新、甜感更自然",
+      "abvDelta": 0,
+      "methods": "摇和 / 搅拌",
+      "priority": 1
+    },
+    {
+      "from": "rye",
+      "to": "bourbon",
+      "ratio": 1,
+      "flavor": "更甜美柔和，辛辣感下降",
+      "abvDelta": -2,
+      "methods": "全部方法",
+      "priority": 1
+    },
+    {
+      "from": "bourbon",
+      "to": "rye",
+      "ratio": 1,
+      "flavor": "更干冽辛辣",
+      "abvDelta": 2,
+      "methods": "全部方法",
+      "priority": 2
+    },
+    {
+      "from": "gin",
+      "to": "vodka",
+      "ratio": 1,
+      "flavor": "草本杜松子香消失，更中性",
+      "abvDelta": -1,
+      "methods": "搅拌 / 直调",
+      "priority": 3
+    },
+    {
+      "from": "tequila",
+      "to": "mezcal",
+      "ratio": 1,
+      "flavor": "烟熏感明显增强",
+      "abvDelta": 0,
+      "methods": "全部方法",
+      "priority": 2
+    },
+    {
+      "from": "mezcal",
+      "to": "tequila",
+      "ratio": 1,
+      "flavor": "更清爽，无烟熏",
+      "abvDelta": 0,
+      "methods": "全部方法",
+      "priority": 2
+    },
+    {
+      "from": "champagne",
+      "to": "prosecco",
+      "ratio": 1,
+      "flavor": "气泡略粗、果香更直接",
+      "abvDelta": -1,
+      "methods": "全部方法",
+      "priority": 1
+    },
+    {
+      "from": "prosecco",
+      "to": "champagne",
+      "ratio": 1,
+      "flavor": "气泡更细腻、带酵母香",
+      "abvDelta": 1,
+      "methods": "全部方法",
+      "priority": 2
+    },
+    {
+      "from": "grand_marnier",
+      "to": "orange_liqueur",
+      "ratio": 1,
+      "flavor": "少了白兰地基底的厚度",
+      "abvDelta": 0,
+      "methods": "全部方法",
+      "priority": 1
+    },
+    {
+      "from": "bourbon",
+      "to": "blended_scotch",
+      "ratio": 1,
+      "flavor": "更干爽，带轻微泥煤感",
+      "abvDelta": 0,
+      "methods": "全部方法",
+      "priority": 3
+    },
+    {
+      "from": "white_rum",
+      "to": "gold_rum",
+      "ratio": 1,
+      "flavor": "更圆润带焦糖香",
+      "abvDelta": 0,
+      "methods": "全部方法",
+      "priority": 2
+    },
+    {
+      "from": "coffee_liqueur",
+      "to": "espresso",
+      "ratio": 0.7,
+      "extra": {
+        "ing": "simple_syrup",
+        "qty": 10,
+        "unit": "ml"
+      },
+      "flavor": "苦度更高、需补糖",
+      "abvDelta": -15,
+      "methods": "摇和",
+      "priority": 2
+    }
+  ]
+}

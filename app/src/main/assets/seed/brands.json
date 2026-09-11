@@ -1,0 +1,145 @@
+{
+  "version": "2026.09.05",
+  "brands": [
+    {
+      "ingredient": "gin",
+      "brand": "添加利 Tanqueray",
+      "label": "London Dry",
+      "abv": 47.3,
+      "cap": 750
+    },
+    {
+      "ingredient": "gin",
+      "brand": "添加利 Tanqueray",
+      "label": "No. TEN",
+      "abv": 47.3,
+      "cap": 750
+    },
+    {
+      "ingredient": "gin",
+      "brand": "必富达 Beefeater",
+      "label": "London Dry",
+      "abv": 40,
+      "cap": 700
+    },
+    {
+      "ingredient": "gin",
+      "brand": "孟买蓝宝石 Bombay",
+      "label": "Sapphire",
+      "abv": 40,
+      "cap": 750
+    },
+    {
+      "ingredient": "gin",
+      "brand": "哥顿 Gordon's",
+      "label": "London Dry",
+      "abv": 37.5,
+      "cap": 700
+    },
+    {
+      "ingredient": "bourbon",
+      "brand": "占边 Jim Beam",
+      "label": "白标",
+      "abv": 40,
+      "cap": 750
+    },
+    {
+      "ingredient": "bourbon",
+      "brand": "美格 Maker's Mark",
+      "label": "波本",
+      "abv": 45,
+      "cap": 750
+    },
+    {
+      "ingredient": "rye",
+      "brand": "瑞顿 Rittenhouse",
+      "label": "黑麦",
+      "abv": 50,
+      "cap": 750
+    },
+    {
+      "ingredient": "white_rum",
+      "brand": "百加得 Bacardí",
+      "label": "白朗姆",
+      "abv": 40,
+      "cap": 750
+    },
+    {
+      "ingredient": "white_rum",
+      "brand": "哈瓦那俱乐部 Havana Club",
+      "label": "3 年",
+      "abv": 40,
+      "cap": 700
+    },
+    {
+      "ingredient": "tequila",
+      "brand": "豪帅 Jose Cuervo",
+      "label": "银标",
+      "abv": 38,
+      "cap": 750
+    },
+    {
+      "ingredient": "vodka",
+      "brand": "绝对 Absolut",
+      "label": "原味",
+      "abv": 40,
+      "cap": 700
+    },
+    {
+      "ingredient": "cognac",
+      "brand": "轩尼诗 Hennessy",
+      "label": "V.S",
+      "abv": 40,
+      "cap": 700
+    },
+    {
+      "ingredient": "campari",
+      "brand": "金巴利 Campari",
+      "label": "苦味利口酒",
+      "abv": 25,
+      "cap": 700
+    },
+    {
+      "ingredient": "orange_liqueur",
+      "brand": "君度 Cointreau",
+      "label": "橙味",
+      "abv": 40,
+      "cap": 700
+    },
+    {
+      "ingredient": "dry_vermouth",
+      "brand": "马天尼 Martini",
+      "label": "干 Extra Dry",
+      "abv": 15,
+      "cap": 1000
+    },
+    {
+      "ingredient": "sweet_vermouth",
+      "brand": "马天尼 Martini",
+      "label": "红 Rosso",
+      "abv": 15,
+      "cap": 1000
+    },
+    {
+      "ingredient": "aromatic_bitters",
+      "brand": "安高天娜 Angostura",
+      "label": "芳香苦精",
+      "abv": 44.7,
+      "cap": 200
+    },
+    {
+      "ingredient": "simple_syrup",
+      "brand": "莫林 Monin",
+      "label": "原味糖浆",
+      "abv": 0,
+      "cap": 700
+    },
+    {
+      "ingredient": "tonic",
+      "brand": "屈臣氏 Watson's",
+      "label": "汤力水",
+      "abv": 0,
+      "cap": 330
+    }
+  ]
+}

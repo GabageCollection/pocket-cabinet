@@ -1,0 +1,1153 @@
+{
+  "version": "2026.09.05",
+  "ingredients": [
+    {
+      "id": "gin",
+      "zh": "伦敦干金酒",
+      "en": "London Dry Gin",
+      "cat": "base",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 43,
+      "aliases": [
+        "金酒",
+        "琴酒",
+        "杜松子酒",
+        "gin",
+        "dry gin",
+        "添加利",
+        "tanqueray",
+        "必富达",
+        "beefeater",
+        "孟买蓝宝石",
+        "bombay",
+        "哥顿",
+        "gordon"
+      ]
+    },
+    {
+      "id": "bourbon",
+      "zh": "波本威士忌",
+      "en": "Bourbon Whiskey",
+      "cat": "base",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 40,
+      "aliases": [
+        "波本",
+        "bourbon",
+        "占边",
+        "jim beam",
+        "美格",
+        "maker"
+      ]
+    },
+    {
+      "id": "rye",
+      "zh": "黑麦威士忌",
+      "en": "Rye Whiskey",
+      "cat": "base",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 45,
+      "aliases": [
+        "黑麦",
+        "rye"
+      ]
+    },
+    {
+      "id": "white_rum",
+      "zh": "白朗姆酒",
+      "en": "White Rum",
+      "cat": "base",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 40,
+      "aliases": [
+        "朗姆",
+        "rum",
+        "白朗姆",
+        "百加得",
+        "bacardi",
+        "哈瓦那",
+        "havana"
+      ]
+    },
+    {
+      "id": "tequila",
+      "zh": "龙舌兰酒",
+      "en": "Tequila Blanco",
+      "cat": "base",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 40,
+      "aliases": [
+        "龙舌兰",
+        "tequila",
+        "豪帅",
+        "cuervo"
+      ]
+    },
+    {
+      "id": "vodka",
+      "zh": "伏特加",
+      "en": "Vodka",
+      "cat": "base",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 40,
+      "aliases": [
+        "伏特加",
+        "vodka",
+        "绝对",
+        "absolut",
+        "斯米诺",
+        "smirnoff"
+      ]
+    },
+    {
+      "id": "cognac",
+      "zh": "干邑白兰地",
+      "en": "Cognac",
+      "cat": "base",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 40,
+      "aliases": [
+        "干邑",
+        "白兰地",
+        "cognac",
+        "brandy",
+        "轩尼诗",
+        "hennessy"
+      ]
+    },
+    {
+      "id": "campari",
+      "zh": "金巴利",
+      "en": "Campari",
+      "cat": "liqueur",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 25,
+      "aliases": [
+        "金巴利",
+        "campari",
+        "金巴利苦味酒"
+      ]
+    },
+    {
+      "id": "orange_liqueur",
+      "zh": "橙味利口酒",
+      "en": "Orange Liqueur",
+      "cat": "liqueur",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 40,
+      "aliases": [
+        "君度",
+        "cointreau",
+        "橙酒",
+        "triple sec",
+        "橙皮酒"
+      ]
+    },
+    {
+      "id": "dry_vermouth",
+      "zh": "干味美思",
+      "en": "Dry Vermouth",
+      "cat": "liqueur",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 15,
+      "allergens": [
+        "亚硫酸盐"
+      ],
+      "aliases": [
+        "干味美思",
+        "dry vermouth",
+        "马天尼干",
+        "martini dry",
+        "味美思"
+      ]
+    },
+    {
+      "id": "sweet_vermouth",
+      "zh": "甜味美思",
+      "en": "Sweet Vermouth",
+      "cat": "liqueur",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 16,
+      "allergens": [
+        "亚硫酸盐"
+      ],
+      "aliases": [
+        "甜味美思",
+        "sweet vermouth",
+        "红味美思",
+        "rosso"
+      ]
+    },
+    {
+      "id": "lime_cordial",
+      "zh": "玫瑰青柠汁",
+      "en": "Lime Cordial",
+      "cat": "mix",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 0,
+      "aliases": [
+        "玫瑰青柠",
+        "rose",
+        "lime cordial",
+        "青柠甜汁"
+      ]
+    },
+    {
+      "id": "simple_syrup",
+      "zh": "原味糖浆",
+      "en": "Simple Syrup",
+      "cat": "mix",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 0,
+      "aliases": [
+        "糖浆",
+        "simple syrup",
+        "莫林",
+        "monin",
+        "原味糖浆"
+      ]
+    },
+    {
+      "id": "honey_syrup",
+      "zh": "蜂蜜糖浆",
+      "en": "Honey Syrup",
+      "cat": "mix",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 0,
+      "allergens": [
+        "蜂蜜"
+      ],
+      "aliases": [
+        "蜂蜜",
+        "honey"
+      ]
+    },
+    {
+      "id": "tonic",
+      "zh": "汤力水",
+      "en": "Tonic Water",
+      "cat": "mix",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 0,
+      "aliases": [
+        "汤力",
+        "tonic",
+        "屈臣氏",
+        "watson",
+        "奎宁水"
+      ]
+    },
+    {
+      "id": "cola",
+      "zh": "可乐",
+      "en": "Cola",
+      "cat": "mix",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 0,
+      "aliases": [
+        "可乐",
+        "cola",
+        "可口可乐",
+        "coca"
+      ]
+    },
+    {
+      "id": "soda",
+      "zh": "苏打水",
+      "en": "Soda Water",
+      "cat": "mix",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 0,
+      "aliases": [
+        "苏打",
+        "soda",
+        "气泡水",
+        "seltzer"
+      ]
+    },
+    {
+      "id": "cranberry_juice",
+      "zh": "蔓越莓汁",
+      "en": "Cranberry Juice",
+      "cat": "mix",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 0,
+      "aliases": [
+        "蔓越莓",
+        "cranberry"
+      ]
+    },
+    {
+      "id": "aromatic_bitters",
+      "zh": "芳香苦精",
+      "en": "Aromatic Bitters",
+      "cat": "bitters",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 44.7,
+      "aliases": [
+        "苦精",
+        "安高天娜",
+        "angostura",
+        "bitters",
+        "芳香苦精"
+      ]
+    },
+    {
+      "id": "orange_bitters",
+      "zh": "橙味苦精",
+      "en": "Orange Bitters",
+      "cat": "bitters",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 28,
+      "aliases": [
+        "橙味苦精",
+        "orange bitters"
+      ]
+    },
+    {
+      "id": "lime",
+      "zh": "青柠",
+      "en": "Lime",
+      "cat": "fresh",
+      "dim": "count",
+      "unit": "个",
+      "yieldMl": 25,
+      "aliases": [
+        "青柠",
+        "lime",
+        "青柠檬",
+        "莱姆"
+      ]
+    },
+    {
+      "id": "lemon",
+      "zh": "黄柠檬",
+      "en": "Lemon",
+      "cat": "fresh",
+      "dim": "count",
+      "unit": "个",
+      "yieldMl": 40,
+      "aliases": [
+        "柠檬",
+        "lemon",
+        "黄柠檬",
+        "安岳柠檬"
+      ]
+    },
+    {
+      "id": "orange",
+      "zh": "橙子",
+      "en": "Orange",
+      "cat": "fresh",
+      "dim": "count",
+      "unit": "个",
+      "yieldMl": 60,
+      "aliases": [
+        "橙",
+        "orange",
+        "甜橙"
+      ]
+    },
+    {
+      "id": "mint",
+      "zh": "新鲜薄荷",
+      "en": "Fresh Mint",
+      "cat": "fresh",
+      "dim": "count",
+      "unit": "枝",
+      "aliases": [
+        "薄荷",
+        "mint",
+        "薄荷叶"
+      ]
+    },
+    {
+      "id": "egg_white",
+      "zh": "蛋清",
+      "en": "Egg White",
+      "cat": "fresh",
+      "dim": "count",
+      "unit": "个",
+      "allergens": [
+        "蛋"
+      ],
+      "aliases": [
+        "蛋清",
+        "egg white",
+        "蛋白"
+      ]
+    },
+    {
+      "id": "sugar_cube",
+      "zh": "方糖",
+      "en": "Sugar Cube",
+      "cat": "mix",
+      "dim": "count",
+      "unit": "块",
+      "aliases": [
+        "方糖",
+        "sugar cube"
+      ]
+    },
+    {
+      "id": "ice",
+      "zh": "冰块",
+      "en": "Ice",
+      "cat": "fresh",
+      "dim": "vol",
+      "unit": "ml",
+      "staple": true,
+      "aliases": [
+        "冰",
+        "ice"
+      ]
+    },
+    {
+      "id": "salt",
+      "zh": "食盐",
+      "en": "Salt",
+      "cat": "mix",
+      "dim": "mass",
+      "unit": "g",
+      "staple": true,
+      "aliases": [
+        "盐",
+        "salt"
+      ]
+    },
+    {
+      "id": "mezcal",
+      "zh": "梅斯卡尔",
+      "en": "Mezcal",
+      "cat": "base",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 40,
+      "aliases": [
+        "mezcal",
+        "龙舌兰烟熏酒"
+      ]
+    },
+    {
+      "id": "dark_rum",
+      "zh": "黑朗姆酒",
+      "en": "Dark Rum",
+      "cat": "base",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 40,
+      "aliases": [
+        "黑朗姆",
+        "dark rum",
+        "摩根船长黑",
+        "myers"
+      ]
+    },
+    {
+      "id": "gold_rum",
+      "zh": "金朗姆酒",
+      "en": "Gold Rum",
+      "cat": "base",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 40,
+      "aliases": [
+        "金朗姆",
+        "gold rum",
+        "陈年朗姆",
+        "aged rum"
+      ]
+    },
+    {
+      "id": "blended_scotch",
+      "zh": "调和苏格兰威士忌",
+      "en": "Blended Scotch Whisky",
+      "cat": "base",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 40,
+      "aliases": [
+        "苏格兰威士忌",
+        "scotch",
+        "尊尼获加",
+        "johnnie walker",
+        "芝华士",
+        "chivas"
+      ]
+    },
+    {
+      "id": "irish_whiskey",
+      "zh": "爱尔兰威士忌",
+      "en": "Irish Whiskey",
+      "cat": "base",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 40,
+      "aliases": [
+        "irish whiskey",
+        "尊美醇",
+        "jameson"
+      ]
+    },
+    {
+      "id": "apple_brandy",
+      "zh": "苹果白兰地",
+      "en": "Apple Brandy / Calvados",
+      "cat": "base",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 40,
+      "aliases": [
+        "卡尔瓦多斯",
+        "calvados",
+        "苹果白兰地",
+        "applejack"
+      ]
+    },
+    {
+      "id": "pisco",
+      "zh": "皮斯科",
+      "en": "Pisco",
+      "cat": "base",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 40,
+      "aliases": [
+        "pisco",
+        "皮斯科白兰地"
+      ]
+    },
+    {
+      "id": "cachaca",
+      "zh": "卡莎萨",
+      "en": "Cachaça",
+      "cat": "base",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 40,
+      "aliases": [
+        "cachaca",
+        "巴西甘蔗酒"
+      ]
+    },
+    {
+      "id": "champagne",
+      "zh": "香槟",
+      "en": "Champagne",
+      "cat": "liqueur",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 12,
+      "aliases": [
+        "champagne",
+        "香槟酒"
+      ]
+    },
+    {
+      "id": "prosecco",
+      "zh": "普罗塞克起泡酒",
+      "en": "Prosecco",
+      "cat": "liqueur",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 11,
+      "aliases": [
+        "prosecco",
+        "起泡酒",
+        "气泡酒"
+      ]
+    },
+    {
+      "id": "white_wine",
+      "zh": "干白葡萄酒",
+      "en": "Dry White Wine",
+      "cat": "liqueur",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 12,
+      "aliases": [
+        "white wine",
+        "白葡萄酒"
+      ]
+    },
+    {
+      "id": "coffee_liqueur",
+      "zh": "咖啡利口酒",
+      "en": "Coffee Liqueur",
+      "cat": "liqueur",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 20,
+      "aliases": [
+        "咖啡酒",
+        "kahlua",
+        "甘露",
+        "tia maria"
+      ]
+    },
+    {
+      "id": "amaretto",
+      "zh": "杏仁利口酒",
+      "en": "Amaretto",
+      "cat": "liqueur",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 28,
+      "aliases": [
+        "amaretto",
+        "蒂萨诺",
+        "disaronno",
+        "杏仁酒"
+      ]
+    },
+    {
+      "id": "maraschino_liqueur",
+      "zh": "黑樱桃利口酒",
+      "en": "Maraschino Liqueur",
+      "cat": "liqueur",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 32,
+      "aliases": [
+        "maraschino",
+        "路萨朵",
+        "luxardo"
+      ]
+    },
+    {
+      "id": "green_chartreuse",
+      "zh": "绿查特酒",
+      "en": "Green Chartreuse",
+      "cat": "liqueur",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 55,
+      "aliases": [
+        "chartreuse",
+        "查特酒",
+        "绿荨麻酒"
+      ]
+    },
+    {
+      "id": "yellow_chartreuse",
+      "zh": "黄查特酒",
+      "en": "Yellow Chartreuse",
+      "cat": "liqueur",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 40,
+      "aliases": [
+        "yellow chartreuse",
+        "黄荨麻酒"
+      ]
+    },
+    {
+      "id": "benedictine",
+      "zh": "廊酒",
+      "en": "Bénédictine",
+      "cat": "liqueur",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 40,
+      "aliases": [
+        "benedictine",
+        "当酒"
+      ]
+    },
+    {
+      "id": "grand_marnier",
+      "zh": "柑曼怡",
+      "en": "Grand Marnier",
+      "cat": "liqueur",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 40,
+      "aliases": [
+        "grand marnier",
+        "金万利"
+      ]
+    },
+    {
+      "id": "creme_de_cassis",
+      "zh": "黑加仑利口酒",
+      "en": "Crème de Cassis",
+      "cat": "liqueur",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 16,
+      "aliases": [
+        "cassis",
+        "黑加仑酒"
+      ]
+    },
+    {
+      "id": "creme_de_menthe_white",
+      "zh": "白薄荷利口酒",
+      "en": "White Crème de Menthe",
+      "cat": "liqueur",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 25,
+      "aliases": [
+        "creme de menthe",
+        "薄荷酒"
+      ]
+    },
+    {
+      "id": "creme_de_cacao_white",
+      "zh": "白可可利口酒",
+      "en": "White Crème de Cacao",
+      "cat": "liqueur",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 25,
+      "aliases": [
+        "creme de cacao",
+        "可可酒"
+      ]
+    },
+    {
+      "id": "irish_cream",
+      "zh": "爱尔兰奶油利口酒",
+      "en": "Irish Cream Liqueur",
+      "cat": "liqueur",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 17,
+      "aliases": [
+        "baileys",
+        "百利甜",
+        "奶油利口酒"
+      ]
+    },
+    {
+      "id": "peach_schnapps",
+      "zh": "蜜桃利口酒",
+      "en": "Peach Schnapps",
+      "cat": "liqueur",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 20,
+      "aliases": [
+        "peach schnapps",
+        "蜜桃酒",
+        "de kuyper peach"
+      ]
+    },
+    {
+      "id": "blue_curacao",
+      "zh": "蓝橙利口酒",
+      "en": "Blue Curaçao",
+      "cat": "liqueur",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 25,
+      "aliases": [
+        "blue curacao",
+        "蓝橙酒",
+        "bols blue"
+      ]
+    },
+    {
+      "id": "galliano",
+      "zh": "加利安奴",
+      "en": "Galliano",
+      "cat": "liqueur",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 30,
+      "aliases": [
+        "galliano",
+        "佳连露"
+      ]
+    },
+    {
+      "id": "drambuie",
+      "zh": "杜林标",
+      "en": "Drambuie",
+      "cat": "liqueur",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 40,
+      "aliases": [
+        "drambuie"
+      ]
+    },
+    {
+      "id": "apricot_liqueur",
+      "zh": "杏味利口酒",
+      "en": "Apricot Liqueur",
+      "cat": "liqueur",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 25,
+      "aliases": [
+        "apricot brandy",
+        "杏子白兰地利口酒"
+      ]
+    },
+    {
+      "id": "cherry_liqueur",
+      "zh": "樱桃利口酒",
+      "en": "Cherry Liqueur",
+      "cat": "liqueur",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 25,
+      "aliases": [
+        "cherry heering",
+        "樱桃酒",
+        "希琳"
+      ]
+    },
+    {
+      "id": "absinthe",
+      "zh": "苦艾酒",
+      "en": "Absinthe",
+      "cat": "liqueur",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 68,
+      "aliases": [
+        "absinthe",
+        "艾碧斯"
+      ]
+    },
+    {
+      "id": "fernet_branca",
+      "zh": "菲奈特布兰卡",
+      "en": "Fernet Branca",
+      "cat": "liqueur",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 39,
+      "aliases": [
+        "fernet",
+        "苦酒",
+        "非奈特"
+      ]
+    },
+    {
+      "id": "lillet_blanc",
+      "zh": "利莱白",
+      "en": "Lillet Blanc",
+      "cat": "liqueur",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 17,
+      "aliases": [
+        "lillet",
+        "利莱"
+      ]
+    },
+    {
+      "id": "aperol",
+      "zh": "阿佩罗",
+      "en": "Aperol",
+      "cat": "liqueur",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 11,
+      "aliases": [
+        "aperol",
+        "橙光"
+      ]
+    },
+    {
+      "id": "amaro",
+      "zh": "意大利苦酒（诺尼诺风格）",
+      "en": "Amaro Nonino",
+      "cat": "liqueur",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 35,
+      "aliases": [
+        "amaro",
+        "nonino",
+        "苦艾利口酒"
+      ]
+    },
+    {
+      "id": "grenadine",
+      "zh": "红石榴糖浆",
+      "en": "Grenadine",
+      "cat": "mix",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 0,
+      "aliases": [
+        "grenadine",
+        "红石榴汁",
+        "石榴糖浆"
+      ]
+    },
+    {
+      "id": "orgeat",
+      "zh": "杏仁糖浆",
+      "en": "Orgeat",
+      "cat": "mix",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 0,
+      "aliases": [
+        "orgeat",
+        "杏仁露糖浆"
+      ]
+    },
+    {
+      "id": "raspberry_syrup",
+      "zh": "树莓糖浆",
+      "en": "Raspberry Syrup",
+      "cat": "mix",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 0,
+      "aliases": [
+        "raspberry",
+        "覆盆子糖浆"
+      ]
+    },
+    {
+      "id": "agave_syrup",
+      "zh": "龙舌兰糖浆",
+      "en": "Agave Syrup",
+      "cat": "mix",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 0,
+      "aliases": [
+        "agave",
+        "龙舌兰蜜"
+      ]
+    },
+    {
+      "id": "cream",
+      "zh": "淡奶油",
+      "en": "Light Cream",
+      "cat": "mix",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 0,
+      "aliases": [
+        "cream",
+        "稀奶油",
+        "奶油"
+      ]
+    },
+    {
+      "id": "coconut_cream",
+      "zh": "椰浆",
+      "en": "Coconut Cream",
+      "cat": "mix",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 0,
+      "aliases": [
+        "coconut",
+        "椰奶",
+        "椰浆"
+      ]
+    },
+    {
+      "id": "pineapple_juice",
+      "zh": "菠萝汁",
+      "en": "Pineapple Juice",
+      "cat": "mix",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 0,
+      "aliases": [
+        "pineapple juice",
+        "凤梨汁"
+      ]
+    },
+    {
+      "id": "orange_juice",
+      "zh": "橙汁",
+      "en": "Orange Juice",
+      "cat": "mix",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 0,
+      "aliases": [
+        "orange juice",
+        "鲜橙汁"
+      ]
+    },
+    {
+      "id": "grapefruit_juice",
+      "zh": "西柚汁",
+      "en": "Grapefruit Juice",
+      "cat": "mix",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 0,
+      "aliases": [
+        "grapefruit juice",
+        "葡萄柚汁"
+      ]
+    },
+    {
+      "id": "tomato_juice",
+      "zh": "番茄汁",
+      "en": "Tomato Juice",
+      "cat": "mix",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 0,
+      "aliases": [
+        "tomato juice"
+      ]
+    },
+    {
+      "id": "ginger_beer",
+      "zh": "姜汁啤酒",
+      "en": "Ginger Beer",
+      "cat": "mix",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 0,
+      "aliases": [
+        "ginger beer",
+        "姜汁汽水",
+        "干姜水"
+      ]
+    },
+    {
+      "id": "ginger_ale",
+      "zh": "姜汁软饮",
+      "en": "Ginger Ale",
+      "cat": "mix",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 0,
+      "aliases": [
+        "ginger ale"
+      ]
+    },
+    {
+      "id": "hot_coffee",
+      "zh": "热咖啡",
+      "en": "Hot Coffee",
+      "cat": "mix",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 0,
+      "aliases": [
+        "coffee",
+        "咖啡"
+      ]
+    },
+    {
+      "id": "espresso",
+      "zh": "浓缩咖啡",
+      "en": "Espresso",
+      "cat": "mix",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 0,
+      "aliases": [
+        "espresso",
+        "意式浓缩"
+      ]
+    },
+    {
+      "id": "peach_puree",
+      "zh": "蜜桃果泥",
+      "en": "Peach Purée",
+      "cat": "mix",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 0,
+      "aliases": [
+        "peach puree",
+        "白桃果泥"
+      ]
+    },
+    {
+      "id": "peychaud_bitters",
+      "zh": "裴乔苦精",
+      "en": "Peychaud's Bitters",
+      "cat": "bitters",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 35,
+      "aliases": [
+        "peychaud",
+        "裴乔"
+      ]
+    },
+    {
+      "id": "worcestershire_sauce",
+      "zh": "喼汁",
+      "en": "Worcestershire Sauce",
+      "cat": "bitters",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 0,
+      "aliases": [
+        "worcestershire",
+        "辣酱油"
+      ]
+    },
+    {
+      "id": "tabasco",
+      "zh": "塔巴斯科辣酱",
+      "en": "Tabasco",
+      "cat": "bitters",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 0,
+      "aliases": [
+        "tabasco",
+        "辣椒仔"
+      ]
+    },
+    {
+      "id": "orange_flower_water",
+      "zh": "橙花水",
+      "en": "Orange Flower Water",
+      "cat": "bitters",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 0,
+      "aliases": [
+        "orange blossom",
+        "橙花纯露"
+      ]
+    },
+    {
+      "id": "ginger",
+      "zh": "新鲜生姜",
+      "en": "Fresh Ginger",
+      "cat": "fresh",
+      "dim": "count",
+      "unit": "片",
+      "abv": 0,
+      "aliases": [
+        "ginger",
+        "姜片"
+      ]
+    }
+  ]
+}
