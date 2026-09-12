@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.05",
+  "version": "2026.09.12",
   "ingredients": [
     {
       "id": "gin",
@@ -1147,6 +1147,338 @@
       "aliases": [
         "ginger",
         "姜片"
+      ]
+    },
+    {
+      "id": "falernum",
+      "zh": "法勒南糖浆",
+      "en": "Falernum",
+      "cat": "mix",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 0,
+      "aliases": [
+        "falernum",
+        "法勒纳姆",
+        "法勒南"
+      ]
+    },
+    {
+      "id": "raspberry_liqueur",
+      "zh": "覆盆子利口酒",
+      "en": "Raspberry Liqueur",
+      "cat": "liqueur",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 20,
+      "aliases": [
+        "chambord",
+        "香波",
+        "覆盆子酒"
+      ]
+    },
+    {
+      "id": "basil",
+      "zh": "罗勒叶",
+      "en": "Basil",
+      "cat": "fresh",
+      "dim": "count",
+      "unit": "片",
+      "abv": 0,
+      "aliases": [
+        "basil",
+        "罗勒",
+        "九层塔"
+      ]
+    },
+    {
+      "id": "overproof_rum",
+      "zh": "高度白朗姆",
+      "en": "Overproof White Rum",
+      "cat": "base",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 63,
+      "aliases": [
+        "overproof rum",
+        "wray",
+        "牙买加高度朗姆"
+      ]
+    },
+    {
+      "id": "peach_brandy",
+      "zh": "蜜桃白兰地",
+      "en": "Peach Brandy",
+      "cat": "liqueur",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 20,
+      "aliases": [
+        "peach brandy",
+        "桃子白兰地"
+      ]
+    },
+    {
+      "id": "red_wine",
+      "zh": "干红葡萄酒",
+      "en": "Dry Red Wine",
+      "cat": "liqueur",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 13,
+      "aliases": [
+        "red wine",
+        "红酒",
+        "西拉"
+      ]
+    },
+    {
+      "id": "cloves",
+      "zh": "丁香",
+      "en": "Cloves",
+      "cat": "mix",
+      "dim": "count",
+      "unit": "个",
+      "abv": 0,
+      "aliases": [
+        "cloves",
+        "丁香粒"
+      ]
+    },
+    {
+      "id": "vanilla_vodka",
+      "zh": "香草伏特加",
+      "en": "Vanilla Vodka",
+      "cat": "base",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 40,
+      "aliases": [
+        "vanilla vodka",
+        "香草味伏特加"
+      ]
+    },
+    {
+      "id": "passion_fruit_liqueur",
+      "zh": "百香果利口酒",
+      "en": "Passion Fruit Liqueur",
+      "cat": "liqueur",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 20,
+      "aliases": [
+        "passion fruit liqueur",
+        "百香果酒"
+      ]
+    },
+    {
+      "id": "passion_fruit_puree",
+      "zh": "百香果果泥",
+      "en": "Passion Fruit Purée",
+      "cat": "mix",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 0,
+      "aliases": [
+        "passion fruit puree",
+        "百香果泥"
+      ]
+    },
+    {
+      "id": "vanilla_sugar",
+      "zh": "香草糖",
+      "en": "Vanilla Sugar",
+      "cat": "mix",
+      "dim": "mass",
+      "unit": "g",
+      "abv": 0,
+      "aliases": [
+        "vanilla sugar",
+        "香草糖"
+      ]
+    },
+    {
+      "id": "port",
+      "zh": "波特酒",
+      "en": "Ruby Port",
+      "cat": "liqueur",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 20,
+      "aliases": [
+        "port",
+        "波特",
+        "tawny port",
+        "红宝石波特"
+      ]
+    },
+    {
+      "id": "egg_yolk",
+      "zh": "蛋黄",
+      "en": "Egg Yolk",
+      "cat": "fresh",
+      "dim": "count",
+      "unit": "个",
+      "allergens": [
+        "蛋"
+      ],
+      "aliases": [
+        "egg yolk",
+        "蛋黄"
+      ]
+    },
+    {
+      "id": "cynar",
+      "zh": "西娜尔",
+      "en": "Cynar",
+      "cat": "liqueur",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 16.5,
+      "aliases": [
+        "cynar",
+        "朝鲜蓟苦酒"
+      ]
+    },
+    {
+      "id": "sherry",
+      "zh": "雪莉酒",
+      "en": "Amontillado Sherry",
+      "cat": "liqueur",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 17,
+      "aliases": [
+        "sherry",
+        "雪莉",
+        "amontillado",
+        "帕罗卡塔多"
+      ]
+    },
+    {
+      "id": "elderflower_liqueur",
+      "zh": "接骨木花利口酒",
+      "en": "Elderflower Liqueur",
+      "cat": "liqueur",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 20,
+      "aliases": [
+        "elderflower",
+        "st germain",
+        "圣日耳曼"
+      ]
+    },
+    {
+      "id": "chili",
+      "zh": "红辣椒",
+      "en": "Red Chili",
+      "cat": "fresh",
+      "dim": "count",
+      "unit": "片",
+      "abv": 0,
+      "aliases": [
+        "chili",
+        "辣椒",
+        "red chili"
+      ]
+    },
+    {
+      "id": "demerara_rum",
+      "zh": "德梅拉拉朗姆酒",
+      "en": "Demerara Rum",
+      "cat": "base",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 40,
+      "aliases": [
+        "demerara rum",
+        "德梅拉拉"
+      ]
+    },
+    {
+      "id": "cinnamon_syrup",
+      "zh": "肉桂糖浆",
+      "en": "Cinnamon Syrup",
+      "cat": "mix",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 0,
+      "aliases": [
+        "cinnamon syrup",
+        "肉桂糖浆"
+      ]
+    },
+    {
+      "id": "grappa",
+      "zh": "格拉帕",
+      "en": "Grappa",
+      "cat": "base",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 40,
+      "aliases": [
+        "grappa",
+        "果渣白兰地",
+        "意大利果渣酒"
+      ]
+    },
+    {
+      "id": "rhum_agricole",
+      "zh": "农业朗姆酒",
+      "en": "Rhum Agricole",
+      "cat": "base",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 50,
+      "aliases": [
+        "rhum agricole",
+        "agricole",
+        "马提尼克朗姆",
+        "马丁尼克农业朗姆"
+      ]
+    },
+    {
+      "id": "hazelnut_liqueur",
+      "zh": "榛子利口酒",
+      "en": "Hazelnut Liqueur",
+      "cat": "liqueur",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 20,
+      "aliases": [
+        "frangelico",
+        "榛子酒",
+        "hazelnut liqueur"
+      ]
+    },
+    {
+      "id": "allspice_liqueur",
+      "zh": "多香果利口酒",
+      "en": "Allspice Dram",
+      "cat": "liqueur",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 22.5,
+      "aliases": [
+        "allspice dram",
+        "pimento dram",
+        "多香果酒",
+        "圣伊丽莎白多香果"
+      ]
+    },
+    {
+      "id": "chamomile_cordial",
+      "zh": "洋甘菊利口酒",
+      "en": "Chamomile Cordial",
+      "cat": "liqueur",
+      "dim": "vol",
+      "unit": "ml",
+      "abv": 20,
+      "aliases": [
+        "chamomile cordial",
+        "洋甘菊甜酒",
+        "洋甘菊糖浆"
       ]
     }
   ]

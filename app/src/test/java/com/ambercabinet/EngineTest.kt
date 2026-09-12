@@ -119,12 +119,6 @@ class EngineTest {
         assertEquals(3, m.maxCups)
     }
 
-    @Test fun gimletSub1() = runTest {
-        val m = matchEngine.match(recipe("gimlet"), 1, ingredients)
-        assertEquals(RecipeStatus.SUBSTITUTABLE, m.status)
-        assertEquals(1, m.maxCups)
-    }
-
     @Test fun mojitoMissingMint() = runTest {
         val m = matchEngine.match(recipe("mojito"), 1, ingredients)
         assertEquals(RecipeStatus.MISSING, m.status)
@@ -138,6 +132,7 @@ class EngineTest {
     }
 
     @Test fun trinidadInsufficient() = runTest {
+        store.bottles.add(bottle("orgeat", "莫林杏仁", 700.0, 300.0, opened = false))
         val m = matchEngine.match(recipe("trinidad-sour"), 1, ingredients)
         assertEquals(RecipeStatus.INSUFFICIENT, m.status)
     }
@@ -176,8 +171,8 @@ class EngineTest {
 
     @Test fun lastUsedPreferred() = runTest {
         val bf = store.bottles.first { it.brand == "必富达" }
-        store.lastUsed["gin-tonic:gin"] = bf.id
-        val plan = inventory.planPour(recipe("gin-tonic"), 1, ingredients)
+        store.lastUsed["negroni:gin"] = bf.id
+        val plan = inventory.planPour(recipe("negroni"), 1, ingredients)
         assertEquals(bf.id, plan.lines.first { it.targetId == "gin" }.picks[0].first.id)
     }
 

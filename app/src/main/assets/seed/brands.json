@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.05",
+  "version": "2026.09.12",
   "brands": [
     {
       "ingredient": "gin",
@@ -140,6 +140,1154 @@
       "label": "汤力水",
       "abv": 0,
       "cap": 330
+    },
+    {
+      "ingredient": "gin",
+      "brand": "亨利爵士 Hendrick's",
+      "label": "金酒",
+      "abv": 41.4,
+      "cap": 700
+    },
+    {
+      "ingredient": "gin",
+      "brand": "植物学家 The Botanist",
+      "label": "艾雷岛干金",
+      "abv": 46,
+      "cap": 700
+    },
+    {
+      "ingredient": "bourbon",
+      "brand": "布利特 Bulleit",
+      "label": "波本",
+      "abv": 45,
+      "cap": 750
+    },
+    {
+      "ingredient": "bourbon",
+      "brand": "野火鸡 Wild Turkey",
+      "label": "101",
+      "abv": 50.5,
+      "cap": 750
+    },
+    {
+      "ingredient": "rye",
+      "brand": "布利特 Bulleit",
+      "label": "黑麦",
+      "abv": 45,
+      "cap": 750
+    },
+    {
+      "ingredient": "white_rum",
+      "brand": "摩根船长 Captain Morgan",
+      "label": "白朗姆",
+      "abv": 37.5,
+      "cap": 700
+    },
+    {
+      "ingredient": "tequila",
+      "brand": "培恩 Patrón",
+      "label": "银标",
+      "abv": 40,
+      "cap": 750
+    },
+    {
+      "ingredient": "tequila",
+      "brand": "唐胡里奥 Don Julio",
+      "label": "银标",
+      "abv": 40,
+      "cap": 750
+    },
+    {
+      "ingredient": "vodka",
+      "brand": "灰雁 Grey Goose",
+      "label": "原味",
+      "abv": 40,
+      "cap": 700
+    },
+    {
+      "ingredient": "vodka",
+      "brand": "斯米诺 Smirnoff",
+      "label": "红标",
+      "abv": 37.5,
+      "cap": 700
+    },
+    {
+      "ingredient": "cognac",
+      "brand": "马爹利 Martell",
+      "label": "V.S.O.P",
+      "abv": 40,
+      "cap": 700
+    },
+    {
+      "ingredient": "cognac",
+      "brand": "人头马 Rémy Martin",
+      "label": "V.S.O.P",
+      "abv": 40,
+      "cap": 700
+    },
+    {
+      "ingredient": "mezcal",
+      "brand": "德尔玛吉 Del Maguey",
+      "label": "Vida",
+      "abv": 40,
+      "cap": 750
+    },
+    {
+      "ingredient": "mezcal",
+      "brand": "蒙特洛博斯 Montelobos",
+      "label": "Espadín",
+      "abv": 43.2,
+      "cap": 750
+    },
+    {
+      "ingredient": "dark_rum",
+      "brand": "美雅士 Myers's",
+      "label": "黑朗姆",
+      "abv": 40,
+      "cap": 750
+    },
+    {
+      "ingredient": "dark_rum",
+      "brand": "高斯林 Gosling's",
+      "label": "Black Seal",
+      "abv": 40,
+      "cap": 750
+    },
+    {
+      "ingredient": "gold_rum",
+      "brand": "百加得 Bacardí",
+      "label": "Carta Oro",
+      "abv": 40,
+      "cap": 750
+    },
+    {
+      "ingredient": "gold_rum",
+      "brand": "哈瓦那俱乐部 Havana Club",
+      "label": "Añejo Especial",
+      "abv": 40,
+      "cap": 700
+    },
+    {
+      "ingredient": "blended_scotch",
+      "brand": "尊尼获加 Johnnie Walker",
+      "label": "红方 Red Label",
+      "abv": 40,
+      "cap": 700
+    },
+    {
+      "ingredient": "blended_scotch",
+      "brand": "芝华士 Chivas Regal",
+      "label": "12 年",
+      "abv": 40,
+      "cap": 700
+    },
+    {
+      "ingredient": "blended_scotch",
+      "brand": "百龄坛 Ballantine's",
+      "label": "Finest",
+      "abv": 40,
+      "cap": 700
+    },
+    {
+      "ingredient": "irish_whiskey",
+      "brand": "尊美醇 Jameson",
+      "label": "Original",
+      "abv": 40,
+      "cap": 700
+    },
+    {
+      "ingredient": "irish_whiskey",
+      "brand": "布什米尔斯 Bushmills",
+      "label": "Original",
+      "abv": 40,
+      "cap": 700
+    },
+    {
+      "ingredient": "irish_whiskey",
+      "brand": "图拉多 Tullamore D.E.W.",
+      "label": "Original",
+      "abv": 40,
+      "cap": 700
+    },
+    {
+      "ingredient": "apple_brandy",
+      "brand": "布拉德 Boulard",
+      "label": "Calvados Grand Solage",
+      "abv": 40,
+      "cap": 700
+    },
+    {
+      "ingredient": "apple_brandy",
+      "brand": "莱尔德 Laird's",
+      "label": "Applejack",
+      "abv": 40,
+      "cap": 750
+    },
+    {
+      "ingredient": "pisco",
+      "brand": "卡佩尔 Capel",
+      "label": "Transparente",
+      "abv": 40,
+      "cap": 700
+    },
+    {
+      "ingredient": "pisco",
+      "brand": "巴尔索 Barsol",
+      "label": "Quebranta",
+      "abv": 41.3,
+      "cap": 700
+    },
+    {
+      "ingredient": "cachaca",
+      "brand": "五一 Cachaça 51",
+      "label": "原味",
+      "abv": 40,
+      "cap": 965
+    },
+    {
+      "ingredient": "cachaca",
+      "brand": "莱布隆 Leblon",
+      "label": "原味",
+      "abv": 40,
+      "cap": 750
+    },
+    {
+      "ingredient": "overproof_rum",
+      "brand": "沃雷 Wray & Nephew",
+      "label": "White Overproof",
+      "abv": 63,
+      "cap": 700
+    },
+    {
+      "ingredient": "overproof_rum",
+      "brand": "百加得 Bacardí",
+      "label": "151",
+      "abv": 75.5,
+      "cap": 750
+    },
+    {
+      "ingredient": "vanilla_vodka",
+      "brand": "绝对 Absolut",
+      "label": "Vanilia",
+      "abv": 40,
+      "cap": 700
+    },
+    {
+      "ingredient": "vanilla_vodka",
+      "brand": "斯米诺 Smirnoff",
+      "label": "Vanilla",
+      "abv": 37.5,
+      "cap": 700
+    },
+    {
+      "ingredient": "demerara_rum",
+      "brand": "埃尔多拉多 El Dorado",
+      "label": "12 年",
+      "abv": 40,
+      "cap": 700
+    },
+    {
+      "ingredient": "demerara_rum",
+      "brand": "莱蒙哈特 Lemon Hart",
+      "label": "1804",
+      "abv": 40,
+      "cap": 700
+    },
+    {
+      "ingredient": "grappa",
+      "brand": "诺尼诺 Nonino",
+      "label": "Grappa",
+      "abv": 41,
+      "cap": 700
+    },
+    {
+      "ingredient": "grappa",
+      "brand": "纳尔迪尼 Nardini",
+      "label": "Grappa Bianca",
+      "abv": 40,
+      "cap": 700
+    },
+    {
+      "ingredient": "rhum_agricole",
+      "brand": "圣詹姆斯 Saint James",
+      "label": "Blanc",
+      "abv": 50,
+      "cap": 700
+    },
+    {
+      "ingredient": "rhum_agricole",
+      "brand": "克莱芒 Clément",
+      "label": "Blanc",
+      "abv": 40,
+      "cap": 700
+    },
+    {
+      "ingredient": "orange_liqueur",
+      "brand": "玛丽布里亚尔 Marie Brizard",
+      "label": "Triple Sec",
+      "abv": 20,
+      "cap": 700
+    },
+    {
+      "ingredient": "dry_vermouth",
+      "brand": "诺瓦 Noilly Prat",
+      "label": "Extra Dry",
+      "abv": 18,
+      "cap": 750
+    },
+    {
+      "ingredient": "sweet_vermouth",
+      "brand": "卡帕诺 Carpano",
+      "label": "Antica Formula",
+      "abv": 16.5,
+      "cap": 1000
+    },
+    {
+      "ingredient": "sweet_vermouth",
+      "brand": "仙山露 Cinzano",
+      "label": "Rosso",
+      "abv": 16,
+      "cap": 1000
+    },
+    {
+      "ingredient": "champagne",
+      "brand": "酩悦 Moët & Chandon",
+      "label": "Impérial Brut",
+      "abv": 12,
+      "cap": 750
+    },
+    {
+      "ingredient": "champagne",
+      "brand": "凯歌 Veuve Clicquot",
+      "label": "Yellow Label",
+      "abv": 12,
+      "cap": 750
+    },
+    {
+      "ingredient": "prosecco",
+      "brand": "卓林 Zonin",
+      "label": "Prosecco DOC",
+      "abv": 11,
+      "cap": 750
+    },
+    {
+      "ingredient": "prosecco",
+      "brand": "米奥内托 Mionetto",
+      "label": "Prosecco Brut",
+      "abv": 11,
+      "cap": 750
+    },
+    {
+      "ingredient": "white_wine",
+      "brand": "张裕 Changyu",
+      "label": "干白",
+      "abv": 12,
+      "cap": 750
+    },
+    {
+      "ingredient": "white_wine",
+      "brand": "杰卡斯 Jacob's Creek",
+      "label": "霞多丽 Chardonnay",
+      "abv": 12.5,
+      "cap": 750
+    },
+    {
+      "ingredient": "red_wine",
+      "brand": "张裕 Changyu",
+      "label": "干红",
+      "abv": 12,
+      "cap": 750
+    },
+    {
+      "ingredient": "red_wine",
+      "brand": "奔富 Penfolds",
+      "label": "洛神山庄设拉子 Rawson's Retreat",
+      "abv": 13.5,
+      "cap": 750
+    },
+    {
+      "ingredient": "coffee_liqueur",
+      "brand": "甘露 Kahlúa",
+      "label": "原味",
+      "abv": 16,
+      "cap": 700
+    },
+    {
+      "ingredient": "coffee_liqueur",
+      "brand": "蒂亚玛丽亚 Tia Maria",
+      "label": "原味",
+      "abv": 20,
+      "cap": 700
+    },
+    {
+      "ingredient": "amaretto",
+      "brand": "蒂萨诺 Disaronno",
+      "label": "Originale",
+      "abv": 28,
+      "cap": 700
+    },
+    {
+      "ingredient": "amaretto",
+      "brand": "卢萨多 Luxardo",
+      "label": "Amaretto",
+      "abv": 28,
+      "cap": 700
+    },
+    {
+      "ingredient": "maraschino_liqueur",
+      "brand": "路萨朵 Luxardo",
+      "label": "Maraschino Originale",
+      "abv": 32,
+      "cap": 700
+    },
+    {
+      "ingredient": "hazelnut_liqueur",
+      "brand": "芳津 Frangelico",
+      "label": "原味",
+      "abv": 20,
+      "cap": 750
+    },
+    {
+      "ingredient": "hazelnut_liqueur",
+      "brand": "吉法 Giffard",
+      "label": "Noisette",
+      "abv": 20,
+      "cap": 700
+    },
+    {
+      "ingredient": "green_chartreuse",
+      "brand": "查特 Chartreuse",
+      "label": "Verte",
+      "abv": 55,
+      "cap": 700
+    },
+    {
+      "ingredient": "yellow_chartreuse",
+      "brand": "查特 Chartreuse",
+      "label": "Jaune",
+      "abv": 40,
+      "cap": 700
+    },
+    {
+      "ingredient": "benedictine",
+      "brand": "廊酒 Bénédictine",
+      "label": "DOM",
+      "abv": 40,
+      "cap": 700
+    },
+    {
+      "ingredient": "grand_marnier",
+      "brand": "柑曼怡 Grand Marnier",
+      "label": "Cordon Rouge",
+      "abv": 40,
+      "cap": 700
+    },
+    {
+      "ingredient": "fernet_branca",
+      "brand": "菲奈特布兰卡 Fernet-Branca",
+      "label": "原味",
+      "abv": 39,
+      "cap": 700
+    },
+    {
+      "ingredient": "lillet_blanc",
+      "brand": "利莱 Lillet",
+      "label": "Blanc",
+      "abv": 17,
+      "cap": 750
+    },
+    {
+      "ingredient": "aperol",
+      "brand": "阿佩罗 Aperol",
+      "label": "原味",
+      "abv": 11,
+      "cap": 700
+    },
+    {
+      "ingredient": "amaro",
+      "brand": "诺尼诺 Nonino",
+      "label": "Amaro",
+      "abv": 35,
+      "cap": 700
+    },
+    {
+      "ingredient": "amaro",
+      "brand": "蒙特内格罗 Montenegro",
+      "label": "Amaro",
+      "abv": 23,
+      "cap": 700
+    },
+    {
+      "ingredient": "cynar",
+      "brand": "西娜尔 Cynar",
+      "label": "原味",
+      "abv": 16.5,
+      "cap": 700
+    },
+    {
+      "ingredient": "absinthe",
+      "brand": "佩诺 Pernod",
+      "label": "Absinthe",
+      "abv": 68,
+      "cap": 700
+    },
+    {
+      "ingredient": "absinthe",
+      "brand": "卢西德 Lucid",
+      "label": "Absinthe Supérieure",
+      "abv": 62,
+      "cap": 750
+    },
+    {
+      "ingredient": "creme_de_cassis",
+      "brand": "乐嘉 Lejay-Lagoute",
+      "label": "Crème de Cassis",
+      "abv": 16,
+      "cap": 700
+    },
+    {
+      "ingredient": "creme_de_cassis",
+      "brand": "玛丽布里亚尔 Marie Brizard",
+      "label": "Cassis",
+      "abv": 15,
+      "cap": 700
+    },
+    {
+      "ingredient": "creme_de_menthe_white",
+      "brand": "吉法 Giffard",
+      "label": "Menthe Blanche",
+      "abv": 24,
+      "cap": 700
+    },
+    {
+      "ingredient": "creme_de_menthe_white",
+      "brand": "玛丽布里亚尔 Marie Brizard",
+      "label": "Menthe Blanche",
+      "abv": 24,
+      "cap": 700
+    },
+    {
+      "ingredient": "creme_de_cacao_white",
+      "brand": "吉法 Giffard",
+      "label": "Cacao Blanc",
+      "abv": 25,
+      "cap": 700
+    },
+    {
+      "ingredient": "creme_de_cacao_white",
+      "brand": "玛丽布里亚尔 Marie Brizard",
+      "label": "Cacao Blanc",
+      "abv": 25,
+      "cap": 700
+    },
+    {
+      "ingredient": "irish_cream",
+      "brand": "百利 Baileys",
+      "label": "Original",
+      "abv": 17,
+      "cap": 700
+    },
+    {
+      "ingredient": "irish_cream",
+      "brand": "圣布伦丹 Saint Brendan's",
+      "label": "Irish Cream",
+      "abv": 17,
+      "cap": 750
+    },
+    {
+      "ingredient": "peach_schnapps",
+      "brand": "迪凯堡 De Kuyper",
+      "label": "Peachtree",
+      "abv": 20,
+      "cap": 700
+    },
+    {
+      "ingredient": "peach_schnapps",
+      "brand": "波士 Bols",
+      "label": "Peach",
+      "abv": 17,
+      "cap": 700
+    },
+    {
+      "ingredient": "blue_curacao",
+      "brand": "波士 Bols",
+      "label": "Blue Curaçao",
+      "abv": 24,
+      "cap": 700
+    },
+    {
+      "ingredient": "blue_curacao",
+      "brand": "玛丽布里亚尔 Marie Brizard",
+      "label": "Blue Curaçao",
+      "abv": 25,
+      "cap": 700
+    },
+    {
+      "ingredient": "galliano",
+      "brand": "加利安奴 Galliano",
+      "label": "L'Autentico",
+      "abv": 30,
+      "cap": 700
+    },
+    {
+      "ingredient": "drambuie",
+      "brand": "杜林标 Drambuie",
+      "label": "原味",
+      "abv": 40,
+      "cap": 700
+    },
+    {
+      "ingredient": "apricot_liqueur",
+      "brand": "玛丽布里亚尔 Marie Brizard",
+      "label": "Apry",
+      "abv": 25,
+      "cap": 700
+    },
+    {
+      "ingredient": "apricot_liqueur",
+      "brand": "卢萨多 Luxardo",
+      "label": "Albicocca",
+      "abv": 25,
+      "cap": 700
+    },
+    {
+      "ingredient": "cherry_liqueur",
+      "brand": "喜龄 Cherry Heering",
+      "label": "Original",
+      "abv": 24,
+      "cap": 700
+    },
+    {
+      "ingredient": "cherry_liqueur",
+      "brand": "卢萨多 Luxardo",
+      "label": "Sangue Morlacco",
+      "abv": 30,
+      "cap": 700
+    },
+    {
+      "ingredient": "raspberry_liqueur",
+      "brand": "香波 Chambord",
+      "label": "Royal Liqueur",
+      "abv": 16.5,
+      "cap": 700
+    },
+    {
+      "ingredient": "raspberry_liqueur",
+      "brand": "吉法 Giffard",
+      "label": "Framboise",
+      "abv": 20,
+      "cap": 700
+    },
+    {
+      "ingredient": "peach_brandy",
+      "brand": "海勒姆沃克 Hiram Walker",
+      "label": "Peach Brandy",
+      "abv": 20,
+      "cap": 750
+    },
+    {
+      "ingredient": "peach_brandy",
+      "brand": "玛丽布里亚尔 Marie Brizard",
+      "label": "Apry Peach",
+      "abv": 25,
+      "cap": 700
+    },
+    {
+      "ingredient": "elderflower_liqueur",
+      "brand": "圣日耳曼 St-Germain",
+      "label": "Elderflower",
+      "abv": 20,
+      "cap": 750
+    },
+    {
+      "ingredient": "elderflower_liqueur",
+      "brand": "吉法 Giffard",
+      "label": "Fleur de Sureau",
+      "abv": 20,
+      "cap": 700
+    },
+    {
+      "ingredient": "allspice_liqueur",
+      "brand": "圣伊丽莎白 St. Elizabeth",
+      "label": "Allspice Dram",
+      "abv": 22.5,
+      "cap": 750
+    },
+    {
+      "ingredient": "chamomile_cordial",
+      "brand": "布里奥泰 Briottet",
+      "label": "Camomille",
+      "abv": 20,
+      "cap": 700
+    },
+    {
+      "ingredient": "chamomile_cordial",
+      "brand": "吉法 Giffard",
+      "label": "Camomille",
+      "abv": 20,
+      "cap": 700
+    },
+    {
+      "ingredient": "passion_fruit_liqueur",
+      "brand": "艾莉婕 Alizé",
+      "label": "Passion",
+      "abv": 20,
+      "cap": 750
+    },
+    {
+      "ingredient": "passion_fruit_liqueur",
+      "brand": "布里奥泰 Briottet",
+      "label": "Fruit de la Passion",
+      "abv": 20,
+      "cap": 700
+    },
+    {
+      "ingredient": "port",
+      "brand": "泰勒 Taylor's",
+      "label": "Ruby Port",
+      "abv": 20,
+      "cap": 750
+    },
+    {
+      "ingredient": "port",
+      "brand": "桑德曼 Sandeman",
+      "label": "Ruby Port",
+      "abv": 20,
+      "cap": 750
+    },
+    {
+      "ingredient": "sherry",
+      "brand": "卢士涛 Lustau",
+      "label": "Amontillado",
+      "abv": 17.5,
+      "cap": 750
+    },
+    {
+      "ingredient": "sherry",
+      "brand": "哈维斯 Harveys",
+      "label": "Amontillado",
+      "abv": 17,
+      "cap": 750
+    },
+    {
+      "ingredient": "lime_cordial",
+      "brand": "玫瑰 Rose's",
+      "label": "Lime Cordial",
+      "abv": 0,
+      "cap": 1000
+    },
+    {
+      "ingredient": "lime_cordial",
+      "brand": "莫林 Monin",
+      "label": "青柠糖浆",
+      "abv": 0,
+      "cap": 700
+    },
+    {
+      "ingredient": "honey_syrup",
+      "brand": "莫林 Monin",
+      "label": "蜂蜜糖浆",
+      "abv": 0,
+      "cap": 700
+    },
+    {
+      "ingredient": "honey_syrup",
+      "brand": "达芬奇 DaVinci",
+      "label": "蜂蜜糖浆",
+      "abv": 0,
+      "cap": 750
+    },
+    {
+      "ingredient": "cola",
+      "brand": "可口可乐 Coca-Cola",
+      "label": "原味",
+      "abv": 0,
+      "cap": 330
+    },
+    {
+      "ingredient": "cola",
+      "brand": "百事可乐 Pepsi",
+      "label": "原味",
+      "abv": 0,
+      "cap": 330
+    },
+    {
+      "ingredient": "soda",
+      "brand": "屈臣氏 Watson's",
+      "label": "苏打水",
+      "abv": 0,
+      "cap": 330
+    },
+    {
+      "ingredient": "soda",
+      "brand": "圣培露 San Pellegrino",
+      "label": "气泡矿泉水",
+      "abv": 0,
+      "cap": 330
+    },
+    {
+      "ingredient": "cranberry_juice",
+      "brand": "优鲜沛 Ocean Spray",
+      "label": "蔓越莓汁",
+      "abv": 0,
+      "cap": 1000
+    },
+    {
+      "ingredient": "sugar_cube",
+      "brand": "太古 Taikoo",
+      "label": "方糖",
+      "abv": 0,
+      "cap": 454
+    },
+    {
+      "ingredient": "salt",
+      "brand": "莫顿 Morton",
+      "label": "食盐",
+      "abv": 0,
+      "cap": 737
+    },
+    {
+      "ingredient": "grenadine",
+      "brand": "莫林 Monin",
+      "label": "红石榴糖浆",
+      "abv": 0,
+      "cap": 700
+    },
+    {
+      "ingredient": "grenadine",
+      "brand": "波士 Bols",
+      "label": "红石榴糖浆",
+      "abv": 0,
+      "cap": 700
+    },
+    {
+      "ingredient": "orgeat",
+      "brand": "莫林 Monin",
+      "label": "杏仁糖浆",
+      "abv": 0,
+      "cap": 700
+    },
+    {
+      "ingredient": "orgeat",
+      "brand": "费兄弟 Fee Brothers",
+      "label": "Orgeat",
+      "abv": 0,
+      "cap": 950
+    },
+    {
+      "ingredient": "raspberry_syrup",
+      "brand": "莫林 Monin",
+      "label": "树莓糖浆",
+      "abv": 0,
+      "cap": 700
+    },
+    {
+      "ingredient": "raspberry_syrup",
+      "brand": "吉法 Giffard",
+      "label": "Framboise 糖浆",
+      "abv": 0,
+      "cap": 700
+    },
+    {
+      "ingredient": "agave_syrup",
+      "brand": "莫林 Monin",
+      "label": "龙舌兰糖浆",
+      "abv": 0,
+      "cap": 700
+    },
+    {
+      "ingredient": "agave_syrup",
+      "brand": "玛德哈瓦 Madhava",
+      "label": "龙舌兰糖浆",
+      "abv": 0,
+      "cap": 330
+    },
+    {
+      "ingredient": "cream",
+      "brand": "安佳 Anchor",
+      "label": "淡奶油",
+      "abv": 0,
+      "cap": 1000
+    },
+    {
+      "ingredient": "cream",
+      "brand": "雀巢 Nestlé",
+      "label": "淡奶油",
+      "abv": 0,
+      "cap": 1000
+    },
+    {
+      "ingredient": "coconut_cream",
+      "brand": "佳乐 Kara",
+      "label": "椰浆",
+      "abv": 0,
+      "cap": 400
+    },
+    {
+      "ingredient": "coconut_cream",
+      "brand": "俏果 Chaokoh",
+      "label": "椰浆",
+      "abv": 0,
+      "cap": 400
+    },
+    {
+      "ingredient": "pineapple_juice",
+      "brand": "都乐 Dole",
+      "label": "菠萝汁",
+      "abv": 0,
+      "cap": 1000
+    },
+    {
+      "ingredient": "pineapple_juice",
+      "brand": "汇源 Huiyuan",
+      "label": "菠萝汁",
+      "abv": 0,
+      "cap": 1000
+    },
+    {
+      "ingredient": "orange_juice",
+      "brand": "都乐 Dole",
+      "label": "橙汁",
+      "abv": 0,
+      "cap": 1000
+    },
+    {
+      "ingredient": "orange_juice",
+      "brand": "纯果乐 Tropicana",
+      "label": "橙汁",
+      "abv": 0,
+      "cap": 1000
+    },
+    {
+      "ingredient": "grapefruit_juice",
+      "brand": "都乐 Dole",
+      "label": "西柚汁",
+      "abv": 0,
+      "cap": 1000
+    },
+    {
+      "ingredient": "grapefruit_juice",
+      "brand": "纯果乐 Tropicana",
+      "label": "西柚汁",
+      "abv": 0,
+      "cap": 1000
+    },
+    {
+      "ingredient": "tomato_juice",
+      "brand": "亨氏 Heinz",
+      "label": "番茄汁",
+      "abv": 0,
+      "cap": 1000
+    },
+    {
+      "ingredient": "tomato_juice",
+      "brand": "可果美 Kagome",
+      "label": "番茄汁",
+      "abv": 0,
+      "cap": 1000
+    },
+    {
+      "ingredient": "ginger_beer",
+      "brand": "屈臣氏 Watson's",
+      "label": "姜汁啤酒",
+      "abv": 0,
+      "cap": 330
+    },
+    {
+      "ingredient": "ginger_beer",
+      "brand": "宾得宝 Bundaberg",
+      "label": "姜汁啤酒",
+      "abv": 0,
+      "cap": 375
+    },
+    {
+      "ingredient": "ginger_beer",
+      "brand": "芬味树 Fever-Tree",
+      "label": "姜汁啤酒",
+      "abv": 0,
+      "cap": 200
+    },
+    {
+      "ingredient": "ginger_ale",
+      "brand": "怡泉 Schweppes",
+      "label": "姜汁汽水",
+      "abv": 0,
+      "cap": 330
+    },
+    {
+      "ingredient": "ginger_ale",
+      "brand": "加拿大干姜 Canada Dry",
+      "label": "姜汁汽水",
+      "abv": 0,
+      "cap": 330
+    },
+    {
+      "ingredient": "hot_coffee",
+      "brand": "星巴克 Starbucks",
+      "label": "热美式",
+      "abv": 0,
+      "cap": 473
+    },
+    {
+      "ingredient": "hot_coffee",
+      "brand": "雀巢 Nestlé",
+      "label": "热咖啡",
+      "abv": 0,
+      "cap": 473
+    },
+    {
+      "ingredient": "espresso",
+      "brand": "意利 illy",
+      "label": "意式浓缩",
+      "abv": 0,
+      "cap": 250
+    },
+    {
+      "ingredient": "espresso",
+      "brand": "拉瓦萨 Lavazza",
+      "label": "意式浓缩",
+      "abv": 0,
+      "cap": 250
+    },
+    {
+      "ingredient": "peach_puree",
+      "brand": "宝茸 Boiron",
+      "label": "白桃果泥",
+      "abv": 0,
+      "cap": 1000
+    },
+    {
+      "ingredient": "peach_puree",
+      "brand": "拉法尔 Ravifruit",
+      "label": "白桃果泥",
+      "abv": 0,
+      "cap": 1000
+    },
+    {
+      "ingredient": "passion_fruit_puree",
+      "brand": "宝茸 Boiron",
+      "label": "百香果果泥",
+      "abv": 0,
+      "cap": 1000
+    },
+    {
+      "ingredient": "passion_fruit_puree",
+      "brand": "拉法尔 Ravifruit",
+      "label": "百香果果泥",
+      "abv": 0,
+      "cap": 1000
+    },
+    {
+      "ingredient": "vanilla_sugar",
+      "brand": "太古 Taikoo",
+      "label": "香草糖",
+      "abv": 0,
+      "cap": 100
+    },
+    {
+      "ingredient": "vanilla_sugar",
+      "brand": "味好美 McCormick",
+      "label": "香草糖",
+      "abv": 0,
+      "cap": 100
+    },
+    {
+      "ingredient": "cinnamon_syrup",
+      "brand": "莫林 Monin",
+      "label": "肉桂糖浆",
+      "abv": 0,
+      "cap": 700
+    },
+    {
+      "ingredient": "cinnamon_syrup",
+      "brand": "费兄弟 Fee Brothers",
+      "label": "Cinnamon 糖浆",
+      "abv": 0,
+      "cap": 473
+    },
+    {
+      "ingredient": "falernum",
+      "brand": "约翰泰勒 John D. Taylor's",
+      "label": "Velvet Falernum",
+      "abv": 11,
+      "cap": 750
+    },
+    {
+      "ingredient": "falernum",
+      "brand": "费兄弟 Fee Brothers",
+      "label": "Falernum 糖浆",
+      "abv": 0,
+      "cap": 473
+    },
+    {
+      "ingredient": "orange_bitters",
+      "brand": "安高天娜 Angostura",
+      "label": "橙味苦精",
+      "abv": 28,
+      "cap": 200
+    },
+    {
+      "ingredient": "orange_bitters",
+      "brand": "雷根 Regan's",
+      "label": "Orange Bitters No.6",
+      "abv": 28,
+      "cap": 150
+    },
+    {
+      "ingredient": "orange_bitters",
+      "brand": "费兄弟 Fee Brothers",
+      "label": "Orange Bitters",
+      "abv": 0,
+      "cap": 150
+    },
+    {
+      "ingredient": "peychaud_bitters",
+      "brand": "裴乔 Peychaud's",
+      "label": "苦精",
+      "abv": 35,
+      "cap": 150
+    },
+    {
+      "ingredient": "worcestershire_sauce",
+      "brand": "李派林 Lea & Perrins",
+      "label": "喼汁",
+      "abv": 0,
+      "cap": 290
+    },
+    {
+      "ingredient": "worcestershire_sauce",
+      "brand": "亨氏 Heinz",
+      "label": "喼汁",
+      "abv": 0,
+      "cap": 290
+    },
+    {
+      "ingredient": "tabasco",
+      "brand": "塔巴斯科 Tabasco",
+      "label": "原味辣椒酱",
+      "abv": 0,
+      "cap": 150
+    },
+    {
+      "ingredient": "orange_flower_water",
+      "brand": "科尔特斯 Cortas",
+      "label": "橙花水",
+      "abv": 0,
+      "cap": 300
+    },
+    {
+      "ingredient": "orange_flower_water",
+      "brand": "味好美 McCormick",
+      "label": "橙花水",
+      "abv": 0,
+      "cap": 300
+    },
+    {
+      "ingredient": "cloves",
+      "brand": "味好美 McCormick",
+      "label": "丁香",
+      "abv": 0,
+      "cap": 30
     }
   ]
 }

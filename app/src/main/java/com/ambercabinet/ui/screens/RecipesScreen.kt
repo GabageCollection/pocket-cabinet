@@ -126,7 +126,7 @@ fun RecipesScreen(nav: NavHostController, vm: RecipesViewModel = hiltViewModel()
                 }
                 Text("配方来源", color = Muted, fontSize = 11.sp, modifier = Modifier.padding(top = 10.dp, bottom = 6.dp))
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(listOf("all" to "全部", "iba" to "IBA", "classic" to "经典", "home" to "家庭简化", "private" to "私人配方", "fav" to "已收藏")) { (k, label) ->
+                    items(listOf("all" to "全部", "iba" to "IBA", "private" to "私人配方", "fav" to "已收藏")) { (k, label) ->
                         FilterChip(selected = s.sourceFilter == k, onClick = { vm.setSource(k) }, label = { Text(label) })
                     }
                 }
