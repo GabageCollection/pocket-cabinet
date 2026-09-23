@@ -5,7 +5,6 @@ import com.ambercabinet.core.data.db.*
 import com.ambercabinet.core.data.repo.*
 import com.ambercabinet.core.data.seed.SeedCatalog
 import com.ambercabinet.core.domain.*
-import com.ambercabinet.testdb.JdbcSQLiteOpenHelper
 import com.ambercabinet.testdb.TestRoom
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
@@ -114,10 +113,14 @@ class RoomDbTest {
         val f = File.createTempFile("amber-test", ".db")
         f.deleteOnExit()
         val db1 = TestRoom.file(f)
-        val catalogRepoDb1 = db1
-        val draft = DraftEntity("d1", "s1", "dry-martini", 2, 3, "{}", "{}", System.currentTimeMillis() + 60000, 45, true, 100L, 200L)
-        catalogRepoDb1.draftDao().upsert(draft)
-        catalogRepoDb1.close()
+        val draft = DraftEntity(
+            id = "d1", sessionId = "s1", recipeId = "dry-martini", servings = 2, currentStep = 3,
+            overridesJson = "{}", subsJson = "{}",
+            timerEndAt = System.currentTimeMillis() + 60000, timerRemainingSec = 45, timerRunning = true,
+            timerStep = 3, createdAt = 100L, updatedAt = 200L
+        )
+        db1.draftDao().upsert(draft)
+        db1.close()
 
         val db2 = TestRoom.file(f)
         val loaded = db2.draftDao().getById("d1")
@@ -126,11 +129,12 @@ class RoomDbTest {
         assertEquals(2, loaded.servings)
         assertTrue(loaded.timerRunning)
         assertEquals(45, loaded.timerRemainingSec)
+        assertEquals(3, loaded.timerStep)
         db2.close()
     }
 
-    /** 迁移 1→2 保留全部用户数据，并新增草稿/自定义材料表 */
-    @Test fun migration12PreservesData() = runTest {
+    /** 迁移 1→4 保留全部用户数据：会话表重建（去掉 status/currentStep）、新增草稿/自定义材料表与 timerStep 列、补热路径索引 */
+    @Test fun migrationPreservesData() = runTest {
         val f = File.createTempFile("amber-mig", ".db")
         f.deleteOnExit()
         TestRoom.createV1File(f,
@@ -138,7 +142,7 @@ class RoomDbTest {
             "INSERT INTO mix_sessions (id, recipeId, servings, status, undone, currentStep, chosenSubsJson, overridesJson, startedAt, finishedAt) VALUES ('s1', 'dry-martini', 2, 'done', 0, 0, '{\"gin\":true}', '{}', 1, 2)",
             "INSERT INTO favorites (recipeId, time) VALUES ('negroni', 99)"
         )
-        val migrated = TestRoom.file(f)   /* Room 打开时执行 MIGRATION_1_2 */
+        val migrated = TestRoom.file(f)   /* Room 打开时执行 MIGRATION_1_2 + MIGRATION_2_3 */
         val b = migrated.bottleDao().getById("b1")
         assertNotNull(b)
         assertEquals(320.5, b!!.remaining, 0.001)
@@ -146,11 +150,48 @@ class RoomDbTest {
         assertNotNull(s)
         assertEquals("", s!!.recipeZh)          /* 旧记录快照列默认为空 */
         assertEquals("{\"gin\":true}", s.chosenSubsJson)  /* 历史数据原样保留 */
+        assertEquals(2, s.servings)               /* v3 表重建后数据仍在 */
         assertEquals(1, migrated.favoriteDao().getAll().size)
-        /* 新表可用 */
-        assertEquals(0, migrated.draftDao().getAll().size)
+        /* 新表可用：草稿表存在且带 timerStep 列 */
+        migrated.draftDao().upsert(DraftEntity("d1", "s1", "dry-martini", 1, 0, "{}", "{}", null, 0, false, timerStep = 0, createdAt = 1L, updatedAt = 1L))
+        assertEquals(0, migrated.draftDao().getById("d1")!!.timerStep)
         assertEquals(0, migrated.customIngredientDao().getAll().size)
+        /* v4 索引已建立：热路径查询不再全表扫描 */
+        val idxNames = mutableSetOf<String>()
+        migrated.openHelper.readableDatabase.query("SELECT name FROM sqlite_master WHERE type = 'index'").use { c ->
+            while (c.moveToNext()) idxNames.add(c.getString(0))
+        }
+        assertTrue("缺少 bottles(ingredientId) 索引", idxNames.contains("index_bottles_ingredientId"))
+        assertTrue("缺少 transactions(sessionId) 索引", idxNames.contains("index_transactions_sessionId"))
+        assertTrue("缺少 transactions(time) 索引", idxNames.contains("index_transactions_time"))
+        assertTrue("缺少 tasting_notes(sessionId) 索引", idxNames.contains("index_tasting_notes_sessionId"))
         migrated.close()
+    }
+
+    /**
+     * 归档过酒瓶后，导出→恢复必须仍然可行（回归）：
+     * 归档瓶（deleted=1）必须随备份导出，否则它的历史流水会成为悬空关联被校验拒绝。
+     */
+    @Test fun archivedBottleSurvivesBackupRoundTrip() = runTest {
+        repo.addBottle(com.ambercabinet.core.model.Bottle(id = "b-keep", ingredientId = "gin", brand = "留着的", initQty = 700.0, remaining = 700.0, unit = "ml"), "手动新增")
+        repo.addBottle(com.ambercabinet.core.model.Bottle(id = "b-arch", ingredientId = "gin", brand = "归档的", initQty = 700.0, remaining = 700.0, unit = "ml"), "手动新增")
+        repo.archiveBottle("b-arch")
+
+        /* 模拟 BackupService.currentBundle()：酒瓶全量（含归档）+ 流水全量 */
+        val bundle = BackupCodec.Bundle(
+            bottles = db.bottleDao().getAll(),
+            txns = db.txnDao().getAll(),
+            sessions = db.sessionDao().getAll(),
+            notes = db.noteDao().getAll(),
+            favorites = db.favoriteDao().getAll(),
+            customRecipes = db.customRecipeDao().getAll(),
+            customIngredients = db.customIngredientDao().getAll(),
+            kv = db.kvDao().getAll(),
+            exportedAt = 1L
+        )
+        val decoded = BackupCodec.decode(BackupCodec.encode(bundle))   /* 校验必须通过 */
+        assertEquals(2, decoded.bottles.size)
+        assertTrue(decoded.bottles.any { it.id == "b-arch" && it.deleted })
     }
 
     /** 旧备份全量恢复：不残留与备份库存矛盾的较新流水（§三.1/三.2） */

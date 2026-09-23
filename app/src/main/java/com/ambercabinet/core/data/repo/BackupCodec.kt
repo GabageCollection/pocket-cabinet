@@ -40,7 +40,17 @@ object BackupCodec {
         val exportedAt: Long = 0L,
         val schemaVersion: Int = SCHEMA_VERSION
     ) {
-        val totalRecords: Int get() = bottles.size + txns.size + sessions.size + notes.size + favorites.size + customRecipes.size + customIngredients.size
+        /** 摘要（导出前预览 / 恢复后提示共用） */
+        fun toSummary() = Summary(
+            exportedAt = exportedAt,
+            schemaVersion = schemaVersion,
+            counts = mapOf(
+                "bottles" to bottles.size, "txns" to txns.size, "sessions" to sessions.size,
+                "notes" to notes.size, "favorites" to favorites.size,
+                "customRecipes" to customRecipes.size, "customIngredients" to customIngredients.size
+            ),
+            photoCount = photos.size
+        )
     }
 
     data class Summary(
@@ -89,19 +99,7 @@ object BackupCodec {
         return if (isZip(bytes)) decodeZip(bytes) else decodeLegacyJson(String(bytes, Charsets.UTF_8))
     }
 
-    fun summarize(bytes: ByteArray): Summary {
-        val b = decode(bytes)
-        return Summary(
-            exportedAt = b.exportedAt,
-            schemaVersion = b.schemaVersion,
-            counts = mapOf(
-                "bottles" to b.bottles.size, "txns" to b.txns.size, "sessions" to b.sessions.size,
-                "notes" to b.notes.size, "favorites" to b.favorites.size,
-                "customRecipes" to b.customRecipes.size, "customIngredients" to b.customIngredients.size
-            ),
-            photoCount = b.photos.size
-        )
-    }
+    fun summarize(bytes: ByteArray): Summary = decode(bytes).toSummary()
 
     private fun isZip(bytes: ByteArray) = bytes.size >= 4 && bytes[0] == 'P'.code.toByte() && bytes[1] == 'K'.code.toByte()
 
@@ -118,9 +116,17 @@ object BackupCodec {
                 if (entries > MAX_ENTRIES) throw Invalid("备份文件条目过多")
                 val name = e.name
                 if (name.contains("..") || name.startsWith("/")) throw Invalid("备份文件路径非法")
-                val content = zip.readBytes()
-                total += content.size
-                if (total > MAX_TOTAL_BYTES) throw Invalid("备份文件解压后过大")
+                /* 分块读取并在超限即中断：高压缩比条目（ZIP 炸弹）不会先吃光内存才触发检查 */
+                val out = ByteArrayOutputStream()
+                val buf = ByteArray(64 * 1024)
+                while (true) {
+                    val n = zip.read(buf)
+                    if (n < 0) break
+                    total += n
+                    if (total > MAX_TOTAL_BYTES) throw Invalid("备份文件解压后过大")
+                    out.write(buf, 0, n)
+                }
+                val content = out.toByteArray()
                 when (name) {
                     "manifest.json" -> manifest = JSONObject(String(content, Charsets.UTF_8))
                     "backup.json" -> dataJson = JSONObject(String(content, Charsets.UTF_8))
@@ -135,6 +141,8 @@ object BackupCodec {
         val schema = m.optInt("schemaVersion", -1)
         if (schema < 1 || schema > SCHEMA_VERSION) throw Invalid("备份版本（$schema）与当前应用不兼容")
         val d = dataJson ?: throw Invalid("备份数据缺失")
+        /* 备份必须自洽：schema > 1 的备份必须含 kv 段（避免截断/拼接文件被当成完整备份） */
+        if (schema > 1 && !d.has("kv")) throw Invalid("备份数据不完整：缺少 kv 段")
         if (m.optString("checksum") != sha256(d.toString().toByteArray(Charsets.UTF_8)))
             throw Invalid("校验失败：备份文件已损坏")
         val bundle = parseData(d, photos, m.optLong("exportedAt"), schema)
@@ -245,7 +253,7 @@ object BackupCodec {
 
     private fun sessionJson(s: SessionEntity) = JSONObject()
         .put("id", s.id).put("recipeId", s.recipeId).put("servings", s.servings)
-        .put("status", s.status).put("undone", s.undone).put("currentStep", s.currentStep)
+        .put("undone", s.undone)
         .put("chosenSubsJson", s.chosenSubsJson).put("overridesJson", s.overridesJson)
         .put("startedAt", s.startedAt).put("finishedAt", s.finishedAt ?: JSONObject.NULL)
         .put("recipeZh", s.recipeZh).put("recipeEn", s.recipeEn)
@@ -289,8 +297,9 @@ object BackupCodec {
     }
     private fun parseSessions(a: JSONArray) = (0 until a.length()).map { i ->
         val o = a.getJSONObject(i)
+        /* v3 起不再有 status/currentStep；旧备份中的这两个字段直接忽略 */
         SessionEntity(o.getString("id"), o.getString("recipeId"), o.getInt("servings"),
-            o.optString("status", "done"), o.optBoolean("undone"), o.optInt("currentStep"),
+            o.optBoolean("undone"),
             o.optString("chosenSubsJson", "{}"), o.optString("overridesJson", "{}"),
             o.getLong("startedAt"), o.optLongOrNull("finishedAt"),
             o.optString("recipeZh", ""), o.optString("recipeEn", ""),

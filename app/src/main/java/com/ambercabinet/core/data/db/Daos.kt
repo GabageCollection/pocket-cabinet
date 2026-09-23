@@ -8,10 +8,15 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface BottleDao {
-    @Query("SELECT * FROM bottles WHERE deleted = 0")
+    /* ORDER BY createdAt：稳定酒柜内同组瓶的展示顺序，不依赖 SQLite 的返回顺序 */
+    @Query("SELECT * FROM bottles WHERE deleted = 0 ORDER BY createdAt")
     fun observeAll(): Flow<List<BottleEntity>>
 
     @Query("SELECT * FROM bottles WHERE deleted = 0")
+    suspend fun getActive(): List<BottleEntity>
+
+    /** 全量（含已归档）：备份必须带上归档瓶，否则其历史流水会成为悬空关联 */
+    @Query("SELECT * FROM bottles")
     suspend fun getAll(): List<BottleEntity>
 
     @Query("SELECT * FROM bottles WHERE id = :id")
@@ -122,6 +127,9 @@ interface CustomRecipeDao {
     @Query("SELECT * FROM custom_recipes")
     suspend fun getAll(): List<CustomRecipeEntity>
 
+    @Query("SELECT * FROM custom_recipes WHERE id = :id AND deleted = 0")
+    suspend fun getById(id: String): CustomRecipeEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(recipe: CustomRecipeEntity)
 
@@ -167,9 +175,6 @@ interface DraftDao {
     @Query("DELETE FROM mix_drafts WHERE id = :id")
     suspend fun delete(id: String)
 
-    @Query("SELECT * FROM mix_drafts")
-    suspend fun getAll(): List<DraftEntity>
-
     @Query("DELETE FROM mix_drafts")
     suspend fun clear()
 }
@@ -181,6 +186,9 @@ interface CustomIngredientDao {
 
     @Query("SELECT * FROM custom_ingredients")
     suspend fun getAll(): List<CustomIngredientEntity>
+
+    @Query("SELECT * FROM custom_ingredients WHERE id = :id")
+    suspend fun getById(id: String): CustomIngredientEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: CustomIngredientEntity)

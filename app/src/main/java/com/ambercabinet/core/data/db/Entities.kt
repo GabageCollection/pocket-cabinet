@@ -1,9 +1,12 @@
 package com.ambercabinet.core.data.db
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "bottles")
+/* v4 索引：按材料查瓶、按会话查流水/笔记是调酒与撤销的热路径；transactions 是唯一持续增长的表。
+   索引名由 Room 按 `index_<表>_<列>` 生成，迁移里必须使用同样的名字。 */
+@Entity(tableName = "bottles", indices = [Index("ingredientId")])
 data class BottleEntity(
     @PrimaryKey val id: String,
     val ingredientId: String,
@@ -23,7 +26,7 @@ data class BottleEntity(
     val deleted: Boolean = false
 )
 
-@Entity(tableName = "transactions")
+@Entity(tableName = "transactions", indices = [Index("sessionId"), Index("time")])
 data class TxnEntity(
     @PrimaryKey val id: String,
     val bottleId: String?,
@@ -43,9 +46,8 @@ data class SessionEntity(
     @PrimaryKey val id: String,
     val recipeId: String,
     val servings: Int,
-    val status: String,
+    /* v3：移除恒为 "done" 的 status 与零读取的 currentStep（本表只保存已完成的调制） */
     val undone: Boolean,
-    val currentStep: Int,
     val chosenSubsJson: String,
     val overridesJson: String,
     val startedAt: Long,
@@ -57,7 +59,7 @@ data class SessionEntity(
     val liquid: String = ""
 )
 
-/** v2：调酒草稿（开始调酒即创建，步骤/计时持久化，提交后删除） */
+/** v2：调酒草稿（开始调酒即创建，步骤/计时持久化，提交后删除）；v3 增加 timerStep */
 @Entity(tableName = "mix_drafts")
 data class DraftEntity(
     @PrimaryKey val id: String,
@@ -70,6 +72,7 @@ data class DraftEntity(
     val timerEndAt: Long?,
     val timerRemainingSec: Int,
     val timerRunning: Boolean,
+    val timerStep: Int = -1,   // 计时所属步骤（-1 = 未记录）
     val createdAt: Long,
     val updatedAt: Long
 )
@@ -90,7 +93,7 @@ data class CustomIngredientEntity(
     val deleted: Boolean = false
 )
 
-@Entity(tableName = "tasting_notes")
+@Entity(tableName = "tasting_notes", indices = [Index("sessionId")])
 data class NoteEntity(
     @PrimaryKey val id: String,
     val sessionId: String,

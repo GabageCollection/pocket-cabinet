@@ -46,7 +46,6 @@ sealed class UndoResult {
     data class Done(val restored: Int) : UndoResult()
     object AlreadyUndone : UndoResult()
     object NotFound : UndoResult()
-    object NotCompleted : UndoResult()
 }
 
 /** 扣减执行抽象（Room 事务在数据层实现）。deduct 返回实际应用的扣减量（统一精度规整后）。 */
@@ -69,6 +68,13 @@ class InventoryService(
     private val matchEngine: MatchEngine
 ) {
 
+    companion object {
+        /* 流水 reason 是历史数据的一部分（旧记录与备份里已是这些字符串），取值绝不能改；
+           判定端（RecordsScreen 等）统一引用这里，不写魔法字符串 */
+        const val REASON_MIX_DEDUCT = "调制扣减"
+        const val REASON_UNDO_ROLLBACK = "撤销回滚"
+    }
+
     /** §7.4 多瓶扣减顺序：用户指定 → 上次使用 → 已开瓶 → 剩余较少；不足时跨瓶 */
     suspend fun pickBottles(
         ingredientId: String,
@@ -77,19 +83,16 @@ class InventoryService(
         recipeId: String?,
         store: InventoryStore = this.store
     ): List<Pair<Bottle, Double>>? {
-        val bs = store.bottlesFor(ingredientId).filter { !it.deleted }.toMutableList()
+        val bs = store.bottlesFor(ingredientId).toMutableList()
         if (bs.isEmpty()) return null
         val lastUsed = recipeId?.let { store.lastBottleFor(it, ingredientId) }
-        bs.sortWith(Comparator { a, b ->
-            when {
-                a.id == overrideBottleId -> -1
-                b.id == overrideBottleId -> 1
-                a.id == lastUsed -> -1
-                b.id == lastUsed -> 1
-                (a.openedAt != null) != (b.openedAt != null) -> if (a.openedAt != null) -1 else 1
-                else -> a.remaining.compareTo(b.remaining)
-            }
-        })
+        /* 声明式比较器（满足传递性）：用户指定 → 上次使用 → 已开瓶 → 剩余较少 */
+        bs.sortWith(
+            compareByDescending<Bottle> { it.id == overrideBottleId }
+                .thenByDescending { it.id == lastUsed }
+                .thenByDescending { it.openedAt != null }
+                .thenBy { it.remaining }
+        )
         val plan = mutableListOf<Pair<Bottle, Double>>()
         var rest = needStockUnits
         for (b in bs) {
@@ -106,7 +109,9 @@ class InventoryService(
         var qty: Double,                 // 库存单位聚合量
         var via: SubstitutionRule?,
         var required: Boolean,
-        val sources: MutableList<String>
+        val sources: MutableList<String>,
+        /* 选瓶覆盖：替代时按用户选的【原材料瓶 id】记录，扣减落在替代材料的目标瓶上 */
+        var overrideBottleId: String? = null
     )
 
     /**
@@ -115,6 +120,8 @@ class InventoryService(
      * 不会每行独立判断「够用」而重复占用同一份库存。
      *
      * @param chosenSubs 用户明确确认的替代：原材料 ID → 替代材料 ID。未确认的替代绝不自动执行。
+     * @param overrides 用户指定的用瓶：**原材料 ID** → 酒瓶 ID。替代生效时同样按原材料 ID 取，
+     *   因此用户为「某材料」挑的瓶不会因为走了替代而被静默忽略。
      */
     suspend fun planPour(
         recipe: Recipe,
@@ -126,23 +133,31 @@ class InventoryService(
     ): PourPlan {
         val demands = LinkedHashMap<String, Demand>()
         val problems = mutableListOf<String>()
+        val skippedUnit = mutableListOf<SkippedItem>()
 
-        fun stockNeed(def: Ingredient, qty: Double, unit: String, targetId: String, bottles: List<Bottle>): Double? {
+        fun stockNeed(def: Ingredient, qty: Double, unit: String, bottles: List<Bottle>): Double? {
             val stockUnit = bottles.firstOrNull()?.unit ?: def.unit
             return Units.needInStockUnit(def, qty, unit, stockUnit)
         }
 
-        suspend fun addDemand(targetId: String, def: Ingredient, qty: Double, unit: String, via: SubstitutionRule?, required: Boolean, label: String): Boolean {
-            val bottles = store.bottlesFor(targetId).filter { !it.deleted }
-            val need = stockNeed(def, qty, unit, targetId, bottles)
+        suspend fun addDemand(targetId: String, def: Ingredient, qty: Double, unit: String, via: SubstitutionRule?, required: Boolean, label: String, overrideBottleId: String?): Boolean {
+            val bottles = store.bottlesFor(targetId)
+            val need = stockNeed(def, qty, unit, bottles)
             if (need == null) {
-                if (required) problems.add(def.zh + " 单位无法换算")
+                /* 无法换算（跨维度或非计量单位如「撮/片皮」）：
+                   必需材料才算问题；可选/装饰按「本次不加」跳过并告知用户，不进 problems */
+                if (required) {
+                    problems.add(def.zh + " 的单位「" + unit + "」无法换算成库存单位，请改用库存单位或删掉这一项")
+                } else {
+                    skippedUnit.add(SkippedItem(def.zh, "单位「" + unit + "」无法换算，本次不加"))
+                }
                 return false
             }
             val d = demands.getOrPut(targetId) { Demand(def, 0.0, via, required, mutableListOf()) }
             d.qty = Qty.round(d.qty + need)
             if (required) d.required = true
             if (via != null) d.via = via
+            if (overrideBottleId != null) d.overrideBottleId = overrideBottleId
             d.sources.add(label)
             return true
         }
@@ -154,6 +169,8 @@ class InventoryService(
 
             val required = ri.role == IngredientRole.REQUIRED
             val label = def.zh + " " + Units.fmt(ri.qty * servings) + " " + ri.unit
+            /* 用户为这行原材料挑的瓶；替代生效时也要跟着走 */
+            val overrideBottleId = overrides[ri.ingredientId]
 
             val chosenTo = chosenSubs[ri.ingredientId]
             val rule = if (chosenTo != null && ri.substitutable)
@@ -164,23 +181,25 @@ class InventoryService(
                 /* 用户已确认的替代：按明确规则标识执行 */
                 val toDef = ingredients[rule.toId]
                 if (toDef == null) { if (required) problems.add("替代材料数据缺失：" + rule.toId); continue }
-                if (!addDemand(rule.toId, toDef, ri.qty * rule.ratio * servings, ri.unit, rule, required, label + "（替代）")) continue
+                if (!addDemand(rule.toId, toDef, ri.qty * rule.ratio * servings, ri.unit, rule, required, label + "（替代）", overrideBottleId)) continue
                 if (rule.extraIngredientId != null && rule.extraQty > 0) {
                     val exDef = ingredients[rule.extraIngredientId]
                     if (exDef == null) { problems.add("替代搭配材料数据缺失"); continue }
-                    addDemand(rule.extraIngredientId, exDef, rule.extraQty * servings, rule.extraUnit, null, required, "替代搭配")
+                    addDemand(rule.extraIngredientId, exDef, rule.extraQty * servings, rule.extraUnit, null, required, "替代搭配", null)
                 }
             } else {
-                if (!addDemand(ri.ingredientId, def, ri.qty * servings, ri.unit, null, required, label)) continue
+                if (!addDemand(ri.ingredientId, def, ri.qty * servings, ri.unit, null, required, label, overrideBottleId)) continue
             }
         }
 
         val lines = mutableListOf<PourLine>()
-        val skipped = mutableListOf<SkippedItem>()
+        val skipped = skippedUnit.toMutableList()
         var ok = problems.isEmpty()
 
         for ((targetId, d) in demands) {
-            val plan = pickBottles(targetId, d.qty, overrides[targetId], recipe.id, store)
+            /* 覆盖瓶只在它确实不属于目标材料时忽略（用户挑的是原材料瓶，替代后目标材料不同） */
+            val override = d.overrideBottleId?.takeIf { oid -> store.bottlesFor(targetId).any { it.id == oid } }
+            val plan = pickBottles(targetId, d.qty, override, recipe.id, store)
             if (plan == null) {
                 if (d.required) {
                     problems.add(d.def.zh + " 库存不足（需要 " + Units.fmt(d.qty) + " " + (store.bottlesFor(targetId).firstOrNull()?.unit ?: d.def.unit) + "）")
@@ -210,11 +229,11 @@ class InventoryService(
         ingredients: Map<String, Ingredient>,
         overrides: Map<String, String> = emptyMap(),
         chosenSubs: Map<String, String> = emptyMap(),
-        expectedFingerprint: String? = null
+        expectedFingerprint: String? = null,
+        startedAt: Long = System.currentTimeMillis()
     ): CommitResult {
-        writer.sessionById(sessionId)?.let { existing ->
-            if (existing.status == "done") return CommitResult.AlreadyCommitted(existing)
-        }
+        /* mix_sessions 只保存已完成的调制：记录存在即已提交 → 幂等返回 */
+        writer.sessionById(sessionId)?.let { return CommitResult.AlreadyCommitted(it) }
 
         val plan = planPour(recipe, servings, ingredients, overrides, chosenSubs)
         if (!plan.ok) return CommitResult.Failed(plan.problems)
@@ -229,6 +248,8 @@ class InventoryService(
             servings = servings,
             chosenSubs = chosenSubs,
             bottleOverrides = overrides,
+            /* 开始时间来自草稿创建时刻，不用默认 now：否则 startedAt 恒等于 finishedAt，调制时长永远为 0 */
+            startedAt = startedAt,
             finishedAt = System.currentTimeMillis(),
             recipeZh = recipe.zh,
             recipeEn = recipe.en,
@@ -246,7 +267,7 @@ class InventoryService(
                         brand = bottle.brand + if (line.via != null) "（替代 " + (ingredients[line.via.fromId]?.zh ?: line.via.fromId) + "）" else "",
                         delta = -applied,
                         unit = bottle.unit,
-                        reason = "调制扣减",
+                        reason = REASON_MIX_DEDUCT,
                         detail = recipe.zh + " × " + servings,
                         sessionId = session.id,
                         time = now
@@ -265,7 +286,6 @@ class InventoryService(
      */
     suspend fun undoSession(sessionId: String): UndoResult {
         val session = writer.sessionById(sessionId) ?: return UndoResult.NotFound
-        if (session.status != "done") return UndoResult.NotCompleted
         if (session.undone) return UndoResult.AlreadyUndone
         val outTxns = writer.txnsForSession(sessionId).filter { it.delta < 0 && !it.undone }
         if (outTxns.isEmpty()) return UndoResult.NotFound
@@ -275,7 +295,7 @@ class InventoryService(
             writer.insertTxn(
                 InventoryTransaction(
                     bottleId = t.bottleId, ingredientId = t.ingredientId, brand = t.brand,
-                    delta = -t.delta, unit = t.unit, reason = "撤销回滚",
+                    delta = -t.delta, unit = t.unit, reason = REASON_UNDO_ROLLBACK,
                     detail = "撤销 " + t.detail, sessionId = sessionId
                 )
             )

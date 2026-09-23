@@ -2,7 +2,17 @@ package com.ambercabinet.ui.screens
 
 import android.app.Activity
 import android.view.WindowManager
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -13,22 +23,24 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.NavHostController
 import com.ambercabinet.core.data.repo.CabinetRepository
 import com.ambercabinet.core.data.repo.CatalogRepository
 import com.ambercabinet.core.domain.*
 import com.ambercabinet.core.model.*
+import com.ambercabinet.core.units.Qty
 import com.ambercabinet.core.units.Units
 import com.ambercabinet.ui.components.GlassPour
+import com.ambercabinet.ui.components.MessageDialog
 import com.ambercabinet.ui.components.MonoNum
-import com.ambercabinet.ui.components.parseLiquid
+import com.ambercabinet.ui.components.isLowStock
 import com.ambercabinet.ui.nav.Routes
 import com.ambercabinet.ui.theme.*
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -83,19 +95,23 @@ class MixViewModel @Inject constructor(
                 _state.update { it.copy(loading = false, error = "配方已经不在了") }
                 return@launch
             }
+            val clamped = draft.copy(currentStep = draft.currentStep.coerceIn(0, (recipe.steps.size - 1).coerceAtLeast(0)))
             _state.update {
                 it.copy(
-                    loading = false, draft = draft, recipe = recipe, ingredients = allIng,
+                    loading = false,
+                    draft = clamped,
+                    recipe = recipe, ingredients = allIng,
                     actual = draft.servings
                 )
             }
-            applyStepTimer(draft, recipe)
+            applyStepTimer(clamped, recipe)
             refreshPlan()
             startTicker()
         }
     }
 
-    /* 计时恢复：运行中以 timerEndAt 为明确时间基准；暂停以剩余秒数为准（§二.2） */
+    /* 计时恢复：运行中以 timerEndAt 为明确时间基准；暂停以剩余秒数为准（§二.2）。
+       timerStep 记录计时所属步骤，避免从别的步骤恢复时显示错误的倒计时（-1 = 旧草稿，按当前步处理） */
     private fun applyStepTimer(draft: MixDraft, recipe: Recipe) {
         val stepDef = recipe.steps.getOrNull(draft.currentStep)
         val total = stepDef?.timerSeconds ?: 0
@@ -103,31 +119,38 @@ class MixViewModel @Inject constructor(
             _state.update { it.copy(timerTotal = 0, timerLeft = 0, timerRunning = false) }
             return
         }
-        val running = draft.timerRunning && draft.timerEndAt != null
+        val timerMatchesStep = draft.timerStep < 0 || draft.timerStep == draft.currentStep
+        val running = draft.timerRunning && draft.timerEndAt != null && timerMatchesStep
+        val endAt = draft.timerEndAt
         val left = when {
-            running -> ceil((draft.timerEndAt!! - System.currentTimeMillis()) / 1000.0).toInt()
-            draft.timerRemainingSec > 0 -> draft.timerRemainingSec
+            running && endAt != null -> ceil((endAt - System.currentTimeMillis()) / 1000.0).toInt()
+            draft.timerRemainingSec > 0 && timerMatchesStep -> draft.timerRemainingSec
             else -> total
         }
         val nowDone = running && left <= 0
         _state.update { it.copy(timerTotal = total, timerLeft = left.coerceIn(0, total), timerRunning = running && !nowDone) }
-        if (nowDone || (running && left <= 0)) persistTimer(running = false, remaining = 0, endAt = null)
+        if (nowDone) persistTimer(running = false, remaining = 0, endAt = null)
         else if (running) persistTimer(running = true, remaining = left, endAt = draft.timerEndAt)
-        else if (draft.timerRemainingSec <= 0) persistTimer(running = false, remaining = total, endAt = null)
+        else if (draft.timerRemainingSec <= 0 || !timerMatchesStep) persistTimer(running = false, remaining = total, endAt = null)
     }
 
     private fun startTicker() {
         viewModelScope.launch {
-            while (true) {
-                delay(250)
-                val st = _state.value
-                val d = st.draft ?: continue
-                if (!st.timerRunning || d.timerEndAt == null) continue
-                val left = ceil((d.timerEndAt - System.currentTimeMillis()) / 1000.0).toInt().coerceAtLeast(0)
-                _state.update { it.copy(timerLeft = left) }
-                if (left <= 0) {
-                    _state.update { it.copy(timerRunning = false) }
-                    persistTimer(running = false, remaining = 0, endAt = null)
+            /* 只在计时运行时 tick：运行状态翻转才唤醒（collectLatest 取消上一轮循环），
+               暂停/停止时协程挂起，不再每 250ms 空转 */
+            _state.map { it.timerRunning }.distinctUntilChanged().collectLatest { running ->
+                if (!running) return@collectLatest
+                while (true) {
+                    delay(250)
+                    val st = _state.value
+                    val d = st.draft ?: break
+                    if (!st.timerRunning || d.timerEndAt == null) break
+                    val left = ceil((d.timerEndAt - System.currentTimeMillis()) / 1000.0).toInt().coerceAtLeast(0)
+                    _state.update { it.copy(timerLeft = left) }
+                    if (left <= 0) {
+                        _state.update { it.copy(timerRunning = false) }
+                        persistTimer(running = false, remaining = 0, endAt = null)
+                    }
                 }
             }
         }
@@ -136,8 +159,8 @@ class MixViewModel @Inject constructor(
     private fun persistTimer(running: Boolean, remaining: Int, endAt: Long?) {
         val d = _state.value.draft ?: return
         viewModelScope.launch {
-            cabinet.saveDraft(d.copy(timerRunning = running, timerRemainingSec = remaining, timerEndAt = endAt))
-            _state.update { it.copy(draft = it.draft?.copy(timerRunning = running, timerRemainingSec = remaining, timerEndAt = endAt)) }
+            cabinet.saveDraft(d.copy(timerRunning = running, timerRemainingSec = remaining, timerEndAt = endAt, timerStep = d.currentStep))
+            _state.update { it.copy(draft = it.draft?.copy(timerRunning = running, timerRemainingSec = remaining, timerEndAt = endAt, timerStep = d.currentStep)) }
         }
     }
 
@@ -146,7 +169,7 @@ class MixViewModel @Inject constructor(
         val d = _state.value.draft ?: return
         val s = step.coerceIn(0, r.steps.size - 1)
         val total = r.steps[s].timerSeconds
-        val nd = d.copy(currentStep = s, timerRunning = false, timerRemainingSec = total, timerEndAt = null)
+        val nd = d.copy(currentStep = s, timerRunning = false, timerRemainingSec = total, timerEndAt = null, timerStep = s)
         _state.update { it.copy(draft = nd, timerTotal = total, timerLeft = total, timerRunning = false) }
         viewModelScope.launch { cabinet.saveDraft(nd) }   /* 切换步骤即保存（§14） */
     }
@@ -263,13 +286,14 @@ class MixViewModel @Inject constructor(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MixSessionScreen(nav: NavHostController, draftId: String, vm: MixViewModel = hiltViewModel()) {
-    val s by vm.state.collectAsState()
+fun MixSessionScreen(nav: NavHostController, vm: MixViewModel = hiltViewModel()) {
+    val s by vm.state.collectAsStateWithLifecycle()
 
-    /* 退出：保存成功后才提示「进度已保存」 */
+    /* 退出：保存成功后才提示「进度已保存」。标记写进**调用方的 entry**（发现页或配方详情），
+       它们各自读自己的 entry，所以从哪儿进来，退回哪儿就能弹出来 */
     LaunchedEffect(s.exitSaved) {
         if (s.exitSaved) {
-            nav.previousBackStackEntry?.savedStateHandle?.set("mix_progress_saved", true)
+            nav.previousBackStackEntry?.savedStateHandle?.set(Routes.MIX_PROGRESS_SAVED, true)
             nav.popBackStack()
         }
     }
@@ -281,12 +305,21 @@ fun MixSessionScreen(nav: NavHostController, draftId: String, vm: MixViewModel =
         onDispose { activity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
     }
 
-    if (s.loading) {
-        Box(Modifier.fillMaxSize().background(Bg), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = Accent)
+    /* 加载 → 内容用淡入淡出衔接 */
+    Crossfade(s.loading, animationSpec = AmberMotion.med(), label = "mixLoading") { loading ->
+        if (loading) {
+            Box(Modifier.fillMaxSize().background(Bg), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = Accent)
+            }
+        } else {
+            MixSessionBody(nav, vm, s)
         }
-        return
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MixSessionBody(nav: NavHostController, vm: MixViewModel, s: MixState) {
     val recipe = s.recipe
     val draft = s.draft
     if (recipe == null || draft == null) {
@@ -311,35 +344,57 @@ fun MixSessionScreen(nav: NavHostController, draftId: String, vm: MixViewModel =
                 }
                 Text("屏幕会一直亮着 · 随时退出，进度都在", color = Muted, fontSize = 12.sp)
             }
-            /* 进度 */
+            /* 进度（切步时颜色平滑过渡） */
             Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                 recipe.steps.forEachIndexed { i, _ ->
+                    val dotColor by animateColorAsState(
+                        when {
+                            i < draft.currentStep -> Muted.copy(alpha = 0.42f)
+                            i == draft.currentStep -> Accent
+                            else -> Fg.copy(alpha = 0.10f)
+                        },
+                        AmberMotion.fast(), label = "stepDot"
+                    )
                     Box(
                         Modifier.weight(1f).height(4.dp).clip(RoundedCornerShape(999.dp))
-                            .background(
-                                when {
-                                    i < draft.currentStep -> Muted.copy(alpha = 0.42f)
-                                    i == draft.currentStep -> Accent
-                                    else -> Fg.copy(alpha = 0.10f)
-                                }
-                            )
+                            .background(dotColor)
                     )
                 }
             }
 
-            Text("第 " + (draft.currentStep + 1) + " 步 / 共 " + recipe.steps.size + " 步 · " + recipe.zh + " × " + draft.servings, color = Accent, fontSize = 12.5.sp, modifier = Modifier.padding(top = 26.dp))
-            Text(step.title, fontSize = 28.sp, color = Fg, modifier = Modifier.padding(top = 10.dp))
-            Text(step.detail, color = Muted, fontSize = 15.sp, lineHeight = 24.sp, modifier = Modifier.padding(top = 12.dp))
+            /* 步骤内容：前进/后退带方向感的滑动切换（计时卡不进动画，避免干扰运行中的计时） */
+            AnimatedContent(
+                targetState = draft.currentStep,
+                transitionSpec = {
+                    if (targetState > initialState) {
+                        (slideInHorizontally(AmberMotion.med()) { it / 2 } + fadeIn(AmberMotion.med()))
+                            .togetherWith(slideOutHorizontally(AmberMotion.med()) { -it / 2 } + fadeOut(AmberMotion.med()))
+                    } else {
+                        (slideInHorizontally(AmberMotion.med()) { -it / 2 } + fadeIn(AmberMotion.med()))
+                            .togetherWith(slideOutHorizontally(AmberMotion.med()) { it / 2 } + fadeOut(AmberMotion.med()))
+                    }
+                },
+                label = "mixStep"
+            ) { stepIndex ->
+                val animStep = recipe.steps.getOrNull(stepIndex)
+                if (animStep != null) {
+                    Column {
+                        Text("第 " + (stepIndex + 1) + " 步 / 共 " + recipe.steps.size + " 步 · " + recipe.zh + " × " + draft.servings, color = Accent, fontSize = 12.5.sp, modifier = Modifier.padding(top = 26.dp))
+                        Text(animStep.title, fontSize = 28.sp, color = Fg, modifier = Modifier.padding(top = 10.dp))
+                        Text(animStep.detail, color = Muted, fontSize = 15.sp, lineHeight = 24.sp, modifier = Modifier.padding(top = 12.dp))
 
-            /* 本步材料用量 */
-            if (step.needs.isNotEmpty()) {
-                Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    step.needs.forEach { (ingId, qty, unit) ->
-                        Surface(color = Surface, shape = RoundedCornerShape(12.dp)) {
-                            Row(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
-                                Text(s.ingredients[ingId]?.zh ?: ingId, fontSize = 13.sp, color = Fg)
-                                Spacer(Modifier.width(6.dp))
-                                MonoNum(if (qty > 0) Units.fmt(qty * draft.servings) + " " + unit else unit, size = 13, color = Accent)
+                        /* 本步材料用量 */
+                        if (animStep.needs.isNotEmpty()) {
+                            Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                animStep.needs.forEach { (ingId, qty, unit) ->
+                                    Surface(color = Surface, shape = RoundedCornerShape(12.dp)) {
+                                        Row(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
+                                            Text(s.ingredients[ingId]?.zh ?: ingId, fontSize = 13.sp, color = Fg)
+                                            Spacer(Modifier.width(6.dp))
+                                            MonoNum(if (qty > 0) Units.fmt(qty * draft.servings) + " " + unit else unit, size = 13, color = Accent)
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -392,14 +447,8 @@ fun MixSessionScreen(nav: NavHostController, draftId: String, vm: MixViewModel =
         }
     }
 
-    s.error?.let { msg ->
-        AlertDialog(
-            onDismissRequest = { vm.clearError() },
-            confirmButton = { TextButton(onClick = { vm.clearError() }) { Text("知道了", color = Accent) } },
-            text = { Text(msg) },
-            containerColor = Raised
-        )
-    }
+    /* 提交/保存失败等运行时错误：统一弹窗（恢复失败的场景已在上方内联展示并 return） */
+    MessageDialog(s.error, vm::clearError)
 
     /* 完成确认弹层（§6.3）：展示的计划与实际提交严格一致 */
     if (s.finishOpen) {
@@ -423,7 +472,8 @@ fun MixSessionScreen(nav: NavHostController, draftId: String, vm: MixViewModel =
                             Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text(
                                     bottle.brand + (if (line.via != null) "（换的材料）" else "") +
-                                        (if (line.picks.size > 1 && i == 0 && line.picks.size > 1) "（用完）" else "") +
+                                        /* 这一瓶确实被扣到见底才标「用完」 */
+                                        (if (bottle.remaining - qty <= Qty.EPS) "（用完）" else "") +
                                         (if (i > 0) "（换下一瓶）" else "") +
                                         " · 剩 " + Units.fmt(bottle.remaining - qty) + " " + bottle.unit,
                                     fontSize = 14.sp, color = Fg
@@ -436,9 +486,10 @@ fun MixSessionScreen(nav: NavHostController, draftId: String, vm: MixViewModel =
                     s.plan?.skipped?.forEach { sk ->
                         Text("已跳过：" + sk.name + "（" + sk.reason + "）", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
                     }
-                    if (s.plan != null && !s.plan!!.ok) {
+                    val plan = s.plan
+                    if (plan != null && !plan.ok) {
                         Text(
-                            "现在库存不够：" + s.plan!!.problems.joinToString("；") + "。不会扣任何东西，少调几杯或回去调整一下。",
+                            "现在库存不够：" + plan.problems.joinToString("；") + "。不会扣任何东西，少调几杯或回去调整一下。",
                             color = StMiss, fontSize = 12.sp, modifier = Modifier.padding(vertical = 8.dp)
                         )
                     }
@@ -453,13 +504,22 @@ fun MixSessionScreen(nav: NavHostController, draftId: String, vm: MixViewModel =
                         shape = RoundedCornerShape(14.dp)
                     ) { Text(if (s.submitting) "正在扣减…" else "确认，扣掉用量并记下这杯") }
                 } else {
-                    val done = s.doneSession!!
+                    val done = s.doneSession ?: return@ModalBottomSheet
                     Column(Modifier.fillMaxWidth()) {
-                        Text("✓", color = StOk, fontSize = 40.sp, modifier = Modifier.align(Alignment.CenterHorizontally))
+                        /* 完成庆祝：酒液从 0 倒满（一次性确认反馈，非循环动画） */
+                        var poured by remember(done.id) { mutableStateOf(false) }
+                        LaunchedEffect(done.id) { poured = true }
+                        val celebrationFill by animateFloatAsState(if (poured) 1f else 0f, AmberMotion.slow(), label = "celebration")
+                        GlassPour(
+                            done.glass.ifBlank { recipe.glass },
+                            done.liquid.ifBlank { recipe.liquid },
+                            Modifier.size(88.dp, 108.dp).align(Alignment.CenterHorizontally),
+                            fill = celebrationFill
+                        )
                         Text(
                             if (s.undone) "这杯的扣减已撤销" else "库存已更新",
                             style = MaterialTheme.typography.titleLarge,
-                            modifier = Modifier.align(Alignment.CenterHorizontally)
+                            modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp)
                         )
                         Text(
                             if (s.undone) "扣掉的量已经加回去了，这杯的记录还在"
@@ -475,6 +535,16 @@ fun MixSessionScreen(nav: NavHostController, draftId: String, vm: MixViewModel =
                                     MonoNum(
                                         "−" + Units.fmt(qty) + " → 剩 " + Units.fmt(bottle.remaining - qty) + " " + bottle.unit,
                                         size = 12, color = Muted
+                                    )
+                                }
+                                /* 扣完后见底的瓶：琥珀色提示，点一下直接去这瓶的详情盘点 */
+                                if (bottle.copy(remaining = bottle.remaining - qty).isLowStock()) {
+                                    Text(
+                                        bottle.brand + " 快见底了 · 去盘点",
+                                        color = StSub, fontSize = 12.sp,
+                                        modifier = Modifier
+                                            .clickable { vm.closeFinish(); nav.navigate(Routes.bottle(bottle.id)) }
+                                            .padding(bottom = 4.dp)
                                     )
                                 }
                             }

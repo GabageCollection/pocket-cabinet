@@ -21,7 +21,7 @@ object Units {
     const val PEELS_PER_FRUIT = 8  // 1 个约出 8 片皮（估算）
 
     val VOLUME_UNITS = listOf("ml", "cl", "oz", "dash", "茶匙")
-    val COUNT_UNITS = listOf("个", "片", "瓣", "枝", "块", "角")
+    val COUNT_UNITS = listOf("个", "片", "瓣", "枝", "块", "角", "片皮", "撮")
     val MASS_UNITS = listOf("g")
     val ALL_UNITS = VOLUME_UNITS + COUNT_UNITS + MASS_UNITS
 
@@ -79,15 +79,12 @@ object Units {
         if (unit == stockUnit) return Qty.round(qty)
         if (unit == "角" && stockUnit == "个") return Qty.round(qty / WEDGES_PER_FRUIT)
         if (unit == "片" && stockUnit == "个") return Qty.round(qty / PEELS_PER_FRUIT)
+        if (unit == "片皮" && stockUnit == "个") return Qty.round(qty / PEELS_PER_FRUIT)
+        /* 「撮」= 一指尖的盐/香料，既非液体也非个数：只在两端同为单位时等价，不跨单位换算 */
         return null
     }
 
-    /** 显示用格式化：最多三位小数，去掉尾零。仅用于显示，不得回写。 */
-    fun fmt(n: Double): String {
-        val r = Qty.round(n)
-        if (r % 1.0 == 0.0) return r.toLong().toString()
-        var s = "%.3f".format(r)
-        while (s.endsWith("0")) s = s.dropLast(1)
-        return s.trimEnd('.')
-    }
+    /** 显示用格式化：最多三位小数，去掉尾零（BigDecimal，不受系统语言环境影响）。仅用于显示，不得回写。 */
+    fun fmt(n: Double): String =
+        java.math.BigDecimal.valueOf(Qty.round(n)).stripTrailingZeros().toPlainString()
 }

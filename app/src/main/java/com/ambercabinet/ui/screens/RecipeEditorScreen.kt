@@ -1,5 +1,7 @@
 package com.ambercabinet.ui.screens
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -8,8 +10,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.NavHostController
 import com.ambercabinet.core.data.repo.CabinetRepository
@@ -26,6 +27,9 @@ import com.ambercabinet.core.data.repo.CatalogRepository
 import com.ambercabinet.core.data.repo.RecordsRepository
 import com.ambercabinet.core.model.*
 import com.ambercabinet.core.units.Units
+import com.ambercabinet.ui.components.AmberTopBar
+import com.ambercabinet.ui.components.Flavor
+import com.ambercabinet.ui.components.LabeledField
 import com.ambercabinet.ui.theme.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -51,13 +55,12 @@ data class EditStep(
 
 data class RecipeEditState(
     val loading: Boolean = true,
-    val baseRecipeId: String? = null,
-    val editingId: String? = null,
     val zh: String = "",
     val en: String = "",
     val method: String = "摇和",
     val glass: String = "rocks",
     val glassZh: String = "古典杯",
+    val liquid: String = "oklch(0.62 0.13 60)",
     val difficulty: Int = 2,
     val timeMin: String = "5",
     val flavors: Set<String> = emptySet(),
@@ -67,9 +70,8 @@ data class RecipeEditState(
     val saved: Boolean = false,
     val deleted: Boolean = false,
     val saving: Boolean = false,
-    val allIngredients: Map<String, Ingredient> = emptyMap(),
-    val pickerOpen: Boolean = false,
-    val pickerQuery: String = ""
+    val dirty: Boolean = false,
+    val allIngredients: Map<String, Ingredient> = emptyMap()
 )
 
 @HiltViewModel
@@ -79,8 +81,9 @@ class RecipeEditViewModel @Inject constructor(
     private val records: RecordsRepository,
     private val savedState: androidx.lifecycle.SavedStateHandle
 ) : ViewModel() {
-    private val editId: String? = savedState.get<String>("id")?.takeIf { it.isNotBlank() }
-    private val baseId: String? = savedState.get<String>("base")?.takeIf { it.isNotBlank() }
+    /* RECIPE_EDIT 路由以 "-" 表示空参数（见 NavGraph.optArg），与空串一起过滤 */
+    private val editId: String? = savedState.get<String>("id")?.takeIf { it.isNotBlank() && it != "-" }
+    private val baseId: String? = savedState.get<String>("base")?.takeIf { it.isNotBlank() && it != "-" }
     private val _state = MutableStateFlow(RecipeEditState())
     val state: StateFlow<RecipeEditState> = _state.asStateFlow()
 
@@ -92,12 +95,12 @@ class RecipeEditViewModel @Inject constructor(
             _state.update {
                 it.copy(
                     loading = false, allIngredients = ings,
-                    editingId = editId, baseRecipeId = baseId,
                     zh = source?.let { s -> if (editId != null) s.zh else s.zh + "（我的版本）" } ?: "",
                     en = source?.en ?: "",
                     method = source?.method ?: "摇和",
                     glass = source?.glass ?: "rocks",
                     glassZh = source?.glassZh ?: "古典杯",
+                    liquid = source?.liquid ?: "oklch(0.62 0.13 60)",
                     difficulty = source?.difficulty ?: 2,
                     timeMin = (source?.timeMin ?: 5).toString(),
                     flavors = source?.flavors?.toSet() ?: emptySet(),
@@ -111,21 +114,34 @@ class RecipeEditViewModel @Inject constructor(
         }
     }
 
-    fun update(f: (RecipeEditState) -> RecipeEditState) = _state.update(f)
-    fun updateIng(key: String, g: (EditIng) -> EditIng) = _state.update { s -> s.copy(ings = s.ings.map { if (it.key == key) g(it) else it }, errors = s.errors - "ings") }
-    fun addIng() = _state.update { it.copy(ings = it.ings + EditIng()) }
-    fun removeIng(key: String) = _state.update { it.copy(ings = it.ings.filterNot { i -> i.key == key }) }
-    fun updateStep(key: String, g: (EditStep) -> EditStep) = _state.update { s -> s.copy(steps = s.steps.map { if (it.key == key) g(it) else it }, errors = s.errors - "steps") }
-    fun addStep() = _state.update { it.copy(steps = it.steps + EditStep()) }
-    fun removeStep(key: String) = _state.update { it.copy(steps = it.steps.filterNot { s -> s.key == key }) }
-    fun toggleFlavor(f: String) = _state.update { it.copy(flavors = if (it.flavors.contains(f)) it.flavors - f else it.flavors + f) }
+    fun update(f: (RecipeEditState) -> RecipeEditState) = _state.update { f(it).copy(dirty = true) }
+    fun updateIng(key: String, g: (EditIng) -> EditIng) = _state.update { s -> s.copy(ings = s.ings.map { if (it.key == key) g(it) else it }, errors = s.errors - "ings", dirty = true) }
+    fun addIng() = _state.update { it.copy(ings = it.ings + EditIng(), dirty = true) }
+    fun removeIng(key: String) = _state.update { it.copy(ings = it.ings.filterNot { i -> i.key == key }, dirty = true) }
+    fun updateStep(key: String, g: (EditStep) -> EditStep) = _state.update { s -> s.copy(steps = s.steps.map { if (it.key == key) g(it) else it }, errors = s.errors - "steps", dirty = true) }
+    fun addStep() = _state.update { it.copy(steps = it.steps + EditStep(), dirty = true) }
+    fun removeStep(key: String) = _state.update { it.copy(steps = it.steps.filterNot { s -> s.key == key }, dirty = true) }
+    fun toggleFlavor(f: String) = _state.update { it.copy(flavors = if (it.flavors.contains(f)) it.flavors - f else it.flavors + f, dirty = true) }
+
+    /** 计时秒数的唯一解析入口：空白 = 不计时（0）；非数字/负数 = null（非法）。校验与保存共用 */
+    private fun parseTimerSec(text: String): Int? =
+        if (text.isBlank()) 0 else text.toIntOrNull()?.takeIf { it >= 0 }
+
+    /** 调制分钟数：1..60 之内才算合法。校验与保存共用同一结果 */
+    private fun parseTimer(text: String): Int? = text.trim().toIntOrNull()?.takeIf { it in 1..60 }
+
+    /** 单杯用量的上限（与校验、保存同一份阈值） */
+    private val maxQty = 100000.0
+
+    /** 单杯用量：区间 (min, max]，非法返回 null。校验与保存共用同一结果 */
+    private fun parseQty(text: String, min: Double = 0.0, max: Double = maxQty): Double? =
+        text.trim().toDoubleOrNull()?.takeIf { it > min && it <= max }
 
     /** 保存前定位具体错误字段，禁止保存无效配方（§14） */
     private fun validate(s: RecipeEditState): Map<String, String> {
         val errs = mutableMapOf<String, String>()
         if (s.zh.isBlank()) errs["zh"] = "给配方起个中文名吧"
-        val time = s.timeMin.toIntOrNull()
-        if (time == null || time !in 1..60) errs["timeMin"] = "调制时间填 1 到 60 之间的分钟数"
+        if (parseTimer(s.timeMin) == null) errs["timeMin"] = "调制时间填 1 到 60 之间的分钟数"
         if (s.ings.isEmpty()) {
             errs["ings"] = "先加一种材料吧"
         } else {
@@ -136,9 +152,13 @@ class RecipeEditViewModel @Inject constructor(
                 }
                 val def = s.allIngredients[ing.ingredientId]
                 if (def == null) { errs["ings"] = "第 " + (i + 1) + " 行的材料找不到了，重新选一个"; return@forEachIndexed }
-                val q = ing.qty.toDoubleOrNull()
-                if (q == null || q <= 0) { errs["ings"] = "第 " + (i + 1) + " 行「" + def.zh + "」的用量填一个大于 0 的数"; return@forEachIndexed }
-                if (q > 100000) { errs["ings"] = "第 " + (i + 1) + " 行的用量太大了，检查一下"; return@forEachIndexed }
+                /* 与 save() 共用 parseQty：这里判 null 就等于保存时一定会拿到合法值 */
+                if (parseQty(ing.qty) == null) {
+                    val raw = ing.qty.trim().toDoubleOrNull()
+                    errs["ings"] = if (raw != null && raw > maxQty) "第 " + (i + 1) + " 行的用量太大了，检查一下"
+                    else "第 " + (i + 1) + " 行「" + def.zh + "」的用量填一个大于 0 的数"
+                    return@forEachIndexed
+                }
                 if (Units.dimensionOf(ing.unit) != def.dimension) {
                     errs["ings"] = "第 " + (i + 1) + " 行「" + def.zh + "」的单位「" + ing.unit + "」对不上，这种材料应该用 " + Units.unitsFor(def.dimension).joinToString("/")
                 }
@@ -151,7 +171,7 @@ class RecipeEditViewModel @Inject constructor(
             errs["steps"] = "给至少一步写个标题吧"
         } else {
             s.steps.forEachIndexed { i, st ->
-                if (st.timer.isNotBlank() && (st.timer.toIntOrNull() == null || st.timer.toInt() < 0)) {
+                if (parseTimerSec(st.timer) == null) {
                     errs["steps"] = "第 " + (i + 1) + " 步的计时填个不小于 0 的秒数，或者不填"
                 }
             }
@@ -180,20 +200,21 @@ class RecipeEditViewModel @Inject constructor(
                     method = s.method,
                     glass = s.glass,
                     glassZh = s.glassZh,
-                    liquid = existing?.liquid ?: "oklch(0.62 0.13 60)",
+                    liquid = existing?.liquid ?: s.liquid,   /* 复制来源配方的酒液色；编辑时保留原值 */
                     abv = 0.0,
-                    timeMin = s.timeMin.toInt(),
+                    timeMin = parseTimer(s.timeMin) ?: 0,
+                    /* 与 validate 共用 parseQty 的同一份结果，校验通过这里必定非 null */
                     ingredients = s.ings.map { ing ->
-                        RecipeIngredient(ing.ingredientId, ing.qty.toDouble(), ing.unit, ing.role)
+                        RecipeIngredient(ing.ingredientId, parseQty(ing.qty) ?: 0.0, ing.unit, ing.role)
                     },
                     steps = s.steps.map { st ->
-                        RecipeStep(st.title.trim(), st.detail.trim(), timerSeconds = st.timer.toIntOrNull() ?: 0)
+                        RecipeStep(st.title.trim(), st.detail.trim(), timerSeconds = parseTimerSec(st.timer) ?: 0)
                     },
                     isUser = true,
                     createdAt = existing?.createdAt ?: now,
                     updatedAt = now
                 )
-                records.saveCustomRecipe(recipe, baseRecipeId = existing?.let { null } ?: baseId)
+                records.saveCustomRecipe(recipe, baseRecipeId = if (existing == null) baseId else null)
                 _state.update { it.copy(saving = false, saved = true) }
             } catch (e: Exception) {
                 _state.update { it.copy(saving = false, errors = mapOf("save" to "保存失败：" + (e.message ?: "原因不明，再试一次"))) }
@@ -203,9 +224,14 @@ class RecipeEditViewModel @Inject constructor(
 
     fun delete() {
         val id = editId ?: return
+        if (_state.value.saving) return
         viewModelScope.launch {
-            records.deleteCustomRecipe(id)
-            _state.update { it.copy(deleted = true) }
+            try {
+                records.deleteCustomRecipe(id)
+                _state.update { it.copy(deleted = true) }
+            } catch (e: Exception) {
+                _state.update { it.copy(errors = mapOf("save" to "删除失败：" + (e.message ?: "原因不明，再试一次"))) }
+            }
         }
     }
 }
@@ -213,36 +239,39 @@ class RecipeEditViewModel @Inject constructor(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecipeEditorScreen(nav: NavHostController, editId: String?, baseId: String?, vm: RecipeEditViewModel = hiltViewModel()) {
-    val s by vm.state.collectAsState()
+    val s by vm.state.collectAsStateWithLifecycle()
     var confirmDelete by remember { mutableStateOf(false) }
+    var confirmDiscard by remember { mutableStateOf(false) }
 
     LaunchedEffect(s.saved, s.deleted) { if (s.saved || s.deleted) nav.popBackStack() }
+
+    /* 有未保存修改时拦截返回键 */
+    BackHandler(enabled = s.dirty && !s.saved && !s.deleted && !s.loading) { confirmDiscard = true }
 
     Scaffold(
         containerColor = Bg,
         topBar = {
-            Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { nav.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", tint = Fg) }
-                Text(
-                    when {
-                        editId != null -> "编辑私人配方"
-                        baseId != null -> "复制为私人配方"
-                        else -> "新建私人配方"
-                    },
-                    fontSize = 18.sp, color = Fg
-                )
-            }
+            AmberTopBar(
+                title = when {
+                    editId != null -> "编辑私人配方"
+                    baseId != null -> "复制为私人配方"
+                    else -> "新建私人配方"
+                },
+                onBack = { if (s.dirty && !s.saved && !s.deleted) confirmDiscard = true else nav.popBackStack() }
+            )
         }
     ) { padding ->
-        if (s.loading) {
-            Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Accent) }
-            return@Scaffold
-        }
+        /* 加载 → 内容淡入淡出衔接 */
+        Crossfade(s.loading, animationSpec = AmberMotion.med(), label = "editorLoading") { loading ->
+            if (loading) {
+                Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Accent) }
+                return@Crossfade
+            }
         Column(Modifier.padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
 
             /* 基本信息 */
-            FieldWithError("中文名", s.zh, s.errors["zh"]) { v -> vm.update { it.copy(zh = v, errors = it.errors - "zh") } }
-            FieldWithError("英文名", s.en, null) { v -> vm.update { it.copy(en = v) } }
+            LabeledField("中文名", s.zh, s.errors["zh"]) { v -> vm.update { it.copy(zh = v, errors = it.errors - "zh") } }
+            LabeledField("英文名", s.en) { v -> vm.update { it.copy(en = v) } }
 
             Text("调制方法", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 14.dp, bottom = 6.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -260,7 +289,7 @@ fun RecipeEditorScreen(nav: NavHostController, editId: String?, baseId: String?,
 
             Text("风味（可多选）", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 12.dp, bottom = 6.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOf("sweet" to "甜", "sour" to "酸", "bitter" to "苦", "fresh" to "清爽", "strong" to "浓烈").forEach { (k, label) ->
+                Flavor.ZH.forEach { (k, label) ->
                     FilterChip(selected = s.flavors.contains(k), onClick = { vm.toggleFlavor(k) }, label = { Text(label, fontSize = 12.sp) })
                 }
             }
@@ -290,7 +319,7 @@ fun RecipeEditorScreen(nav: NavHostController, editId: String?, baseId: String?,
             SectionHead("材料与用量", s.ings.size.toString() + " 种")
             s.errors["ings"]?.let { Text(it, color = StMiss, fontSize = 12.sp, modifier = Modifier.padding(bottom = 6.dp)) }
             s.ings.forEach { ing ->
-                IngredientEditRow(ing, s.allIngredients, { g -> vm.updateIng(ing.key, g) }, { vm.removeIng(ing.key) })
+                key(ing.key) { IngredientEditRow(ing, s.allIngredients, vm) }
             }
             OutlinedButton(onClick = { vm.addIng() }, modifier = Modifier.fillMaxWidth()) { Text("加一种材料") }
 
@@ -298,6 +327,7 @@ fun RecipeEditorScreen(nav: NavHostController, editId: String?, baseId: String?,
             SectionHead("步骤", s.steps.size.toString() + " 步")
             s.errors["steps"]?.let { Text(it, color = StMiss, fontSize = 12.sp, modifier = Modifier.padding(bottom = 6.dp)) }
             s.steps.forEachIndexed { i, st ->
+                key(st.key) {
                 Card(colors = CardDefaults.cardColors(containerColor = Surface), modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                     Column(Modifier.padding(12.dp)) {
                         OutlinedTextField(value = st.title, onValueChange = { v -> vm.updateStep(st.key) { it.copy(title = v) } }, modifier = Modifier.fillMaxWidth(), label = { Text("第 " + (i + 1) + " 步叫什么") }, singleLine = true, shape = RoundedCornerShape(10.dp))
@@ -314,6 +344,7 @@ fun RecipeEditorScreen(nav: NavHostController, editId: String?, baseId: String?,
                             }
                         }
                     }
+                }
                 }
             }
             OutlinedButton(onClick = { vm.addStep() }, modifier = Modifier.fillMaxWidth()) { Text("再加一步") }
@@ -334,6 +365,7 @@ fun RecipeEditorScreen(nav: NavHostController, editId: String?, baseId: String?,
             }
             Spacer(Modifier.height(24.dp))
         }
+        }
     }
 
     if (confirmDelete) {
@@ -346,26 +378,25 @@ fun RecipeEditorScreen(nav: NavHostController, editId: String?, baseId: String?,
             containerColor = Raised
         )
     }
-}
 
-@Composable
-private fun FieldWithError(label: String, value: String, error: String?, onChange: (String) -> Unit) {
-    OutlinedTextField(
-        value = value, onValueChange = onChange,
-        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-        label = { Text(label) }, singleLine = true,
-        isError = error != null,
-        shape = RoundedCornerShape(12.dp)
-    )
-    if (error != null) Text(error, color = StMiss, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+    /* 未保存修改的丢弃确认 */
+    if (confirmDiscard) {
+        AlertDialog(
+            onDismissRequest = { confirmDiscard = false },
+            title = { Text("配方还没保存") },
+            text = { Text("现在退出，刚填的内容就没有了。") },
+            confirmButton = { TextButton(onClick = { confirmDiscard = false; nav.popBackStack() }) { Text("不存了，退出", color = StMiss) } },
+            dismissButton = { TextButton(onClick = { confirmDiscard = false }) { Text("继续编辑", color = Accent) } },
+            containerColor = Raised
+        )
+    }
 }
 
 @Composable
 private fun IngredientEditRow(
     ing: EditIng,
     allIngredients: Map<String, Ingredient>,
-    onUpdate: ((EditIng) -> EditIng) -> Unit,
-    onRemove: () -> Unit
+    vm: RecipeEditViewModel
 ) {
     var pickerOpen by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
@@ -379,12 +410,12 @@ private fun IngredientEditRow(
                     color = if (def != null) Fg else Accent, fontSize = 14.sp,
                     modifier = Modifier.weight(1f).clickable { pickerOpen = true }
                 )
-                TextButton(onClick = onRemove) { Text("删除", color = StMiss, fontSize = 12.sp) }
+                TextButton(onClick = { vm.removeIng(ing.key) }) { Text("删除", color = StMiss, fontSize = 12.sp) }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 OutlinedTextField(
                     value = ing.qty,
-                    onValueChange = { v -> onUpdate { it.copy(qty = v) } },
+                    onValueChange = { v -> vm.updateIng(ing.key) { it.copy(qty = v) } },
                     modifier = Modifier.width(110.dp),
                     label = { Text("每杯用多少") }, singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
@@ -394,13 +425,13 @@ private fun IngredientEditRow(
                 val unitOptions = def?.let { Units.unitsFor(it.dimension) } ?: Units.ALL_UNITS
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     unitOptions.take(4).forEach { u ->
-                        FilterChip(selected = ing.unit == u, onClick = { onUpdate { it.copy(unit = u) } }, label = { Text(u, fontSize = 11.sp) })
+                        FilterChip(selected = ing.unit == u, onClick = { vm.updateIng(ing.key) { it.copy(unit = u) } }, label = { Text(u, fontSize = 11.sp) })
                     }
                 }
             }
             Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf(IngredientRole.REQUIRED to "必需", IngredientRole.OPTIONAL to "可选", IngredientRole.GARNISH to "装饰").forEach { (r, label) ->
-                    FilterChip(selected = ing.role == r, onClick = { onUpdate { it.copy(role = r) } }, label = { Text(label, fontSize = 11.sp) })
+                    FilterChip(selected = ing.role == r, onClick = { vm.updateIng(ing.key) { it.copy(role = r) } }, label = { Text(label, fontSize = 11.sp) })
                 }
             }
         }
@@ -413,18 +444,23 @@ private fun IngredientEditRow(
             text = {
                 Column {
                     OutlinedTextField(value = query, onValueChange = { query = it }, modifier = Modifier.fillMaxWidth(), placeholder = { Text("搜中文或英文名") }, singleLine = true)
+                    /* 候选列表只在材料表变化时重建；小写索引预先算好，敲字只做 contains */
+                    val candidates = remember(allIngredients) {
+                        allIngredients.values.filter { !it.staple }
+                            .map { it to (it.zh + " " + it.en).lowercase() }
+                            .sortedBy { !it.first.isCustom }
+                    }
                     val q = query.lowercase()
-                    val list = allIngredients.values
-                        .filter { !it.staple && (q.isBlank() || (it.zh + it.en).lowercase().contains(q)) }
-                        .sortedBy { !it.isCustom }
-                        .take(50)
+                    val list = remember(candidates, q) {
+                        (if (q.isBlank()) candidates else candidates.filter { it.second.contains(q) }).take(50)
+                    }
                     LazyColumn(Modifier.heightIn(max = 320.dp).padding(top = 8.dp)) {
-                        items(list) { cand ->
+                        items(list, key = { it.first.id }) { (cand, _) ->
                             Text(
                                 cand.zh + " · " + cand.en + (if (cand.isCustom) "（自己加的）" else ""),
                                 color = Fg, fontSize = 14.sp,
-                                modifier = Modifier.fillMaxWidth().clickable {
-                                    onUpdate { it.copy(ingredientId = cand.id, unit = cand.unit) }
+                                modifier = Modifier.fillMaxWidth().animateItem().clickable {
+                                    vm.updateIng(ing.key) { it.copy(ingredientId = cand.id, unit = cand.unit) }
                                     pickerOpen = false
                                 }.padding(vertical = 10.dp)
                             )

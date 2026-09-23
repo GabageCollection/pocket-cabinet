@@ -26,8 +26,9 @@ class EngineTest {
 
     class FakeStore(val bottles: MutableList<Bottle>) : InventoryStore {
         val lastUsed = mutableMapOf<String, String>()
-        override suspend fun bottlesFor(ingredientId: String) = bottles.filter { it.ingredientId == ingredientId }
-        override suspend fun allBottles() = bottles.toList()
+        /* InventoryStore 契约：返回的瓶不含已删除 */
+        override suspend fun bottlesFor(ingredientId: String) = bottles.filter { it.ingredientId == ingredientId && !it.deleted }
+        override suspend fun allBottles() = bottles.filter { !it.deleted }
         override suspend fun lastBottleFor(recipeId: String, ingredientId: String) = lastUsed[recipeId + ":" + ingredientId]
     }
 
@@ -327,16 +328,56 @@ class EngineTest {
     }
 
     @Test fun recommendationExplainable() = runTest {
-        val recs = recommender.recommend(recipes, ingredients, setOf("old-fashioned"), emptySet())
+        val matched = recipes.map { it to matchEngine.match(it, 1, ingredients) }
+        val recs = recommender.recommend(matched, setOf("old-fashioned"), emptySet())
         assertTrue(recs.isNotEmpty())
         assertTrue(recs.first().reasons.size in 1..3)
         assertEquals(RecipeStatus.OK, recs.first().match.status)
     }
 
     @Test fun recentSuppression() = runTest {
-        val a = recommender.recommend(recipes, ingredients, emptySet(), emptySet())
-        val b = recommender.recommend(recipes, ingredients, emptySet(), setOf(a.first().recipe.id))
+        val matched = recipes.map { it to matchEngine.match(it, 1, ingredients) }
+        val a = recommender.recommend(matched, emptySet(), emptySet())
+        val b = recommender.recommend(matched, emptySet(), setOf(a.first().recipe.id))
         assertTrue(b.none { it.recipe.id == a.first().recipe.id } || b.first().recipe.id != a.first().recipe.id || a.size == 1)
+    }
+
+    /* ── 品鉴评分反哺推荐 ── */
+
+    private fun note(rating: Double, sweet: Int? = null, sour: Int? = null, bitter: Int? = null) =
+        TastingNote(sessionId = "s-note", recipeId = "x", rating = rating, sweet = sweet, sour = sour, bitter = bitter)
+
+    /** 均分 4.0 的配方加分 +120，并在推荐理由里提示打分 */
+    @Test fun ratingBoostsHighScoredRecipe() = runTest {
+        val matched = recipes.map { it to matchEngine.match(it, 1, ingredients) }
+        val base = recommender.recommend(matched, emptySet(), emptySet())
+        val with = recommender.recommend(matched, emptySet(), emptySet(), mapOf("dry-martini" to listOf(note(4.0), note(4.0))))
+        val delta = with.first { it.recipe.id == "dry-martini" }.score - base.first { it.recipe.id == "dry-martini" }.score
+        assertEquals(120.0, delta, 0.001)
+        assertTrue(with.first { it.recipe.id == "dry-martini" }.reasons.any { it.contains("你给它打过 4.0 星") })
+    }
+
+    /** 均分 2.0 的配方减分 −120（喝过一次觉得差的往后排） */
+    @Test fun ratingPenalizesLowScoredRecipe() = runTest {
+        val matched = recipes.map { it to matchEngine.match(it, 1, ingredients) }
+        val base = recommender.recommend(matched, emptySet(), emptySet())
+        val with = recommender.recommend(matched, emptySet(), emptySet(), mapOf("dry-martini" to listOf(note(2.0), note(2.0))))
+        val delta = with.first { it.recipe.id == "dry-martini" }.score - base.first { it.recipe.id == "dry-martini" }.score
+        assertEquals(-120.0, delta, 0.001)
+        assertTrue(with.first { it.recipe.id == "dry-martini" }.reasons.any { it.contains("你给它打过 2.0 星") })
+    }
+
+    /** 笔记甜感均值 ≥3.5 → 口味倾向「甜」：带 sweet 标签的配方 +40 并给出理由，不带的配方不受影响 */
+    @Test fun flavorAffinityBoostsMatchingRecipes() = runTest {
+        val matched = recipes.map { it to matchEngine.match(it, 1, ingredients) }
+        val base = recommender.recommend(matched, emptySet(), emptySet())
+        val with = recommender.recommend(
+            matched, emptySet(), emptySet(),
+            mapOf("whiskey-sour" to listOf(note(3.0, sweet = 4), note(3.0, sweet = 4)))
+        )
+        assertEquals(40.0, with.first { it.recipe.id == "old-fashioned" }.score - base.first { it.recipe.id == "old-fashioned" }.score, 0.001)
+        assertEquals(0.0, with.first { it.recipe.id == "dry-martini" }.score - base.first { it.recipe.id == "dry-martini" }.score, 0.001)
+        assertTrue(with.first { it.recipe.id == "old-fashioned" }.reasons.any { it == "合你偏甜的口味" })
     }
 
     @Test fun datasetIntegrity() {
@@ -359,6 +400,88 @@ class EngineTest {
         assertNull(Units.needInStockUnit(lemon, 1.0, "片", "ml"))
         assertNotNull(Units.needInStockUnit(lemon, 30.0, "ml", "个"))
         assertEquals(1.0, Units.needInStockUnit(lemon, 2.0, "dash", "ml")!!, 0.001)
+    }
+
+    /* ── 回归：本次修复的缺陷 ── */
+
+    /** 种子单位白名单：「撮/片皮」等此前不在 ALL_UNITS 里的单位现已纳入并可见 */
+    @Test fun seedUnitsAreKnown() {
+        assertTrue(Units.ALL_UNITS.contains("撮"))
+        assertTrue(Units.ALL_UNITS.contains("片皮"))
+        recipes.forEach { r ->
+            r.ingredients.forEach { ri -> assertTrue("未知单位 " + ri.unit, ri.unit in Units.ALL_UNITS) }
+        }
+    }
+
+    /** 「片皮」按 1 个柠檬 ≈ 8 片皮 换算；「撮」不跨单位换算 */
+    @Test fun peelAndPinchUnits() {
+        val lemon = ingredients.getValue("lemon")
+        assertEquals(0.125, Units.needInStockUnit(lemon, 1.0, "片皮", "个")!!, 0.001)
+        assertNull(Units.needInStockUnit(ingredients.getValue("salt"), 1.0, "撮", "g"))
+    }
+
+    /** 替代生效时，用户为原材料挑的瓶必须仍然生效（此前按 targetId 取覆盖导致静默忽略） */
+    @Test fun substitutionHonorsUserPickedBottle() = runTest {
+        /* 青柠（个）缺货 → 可用黄柠檬替代；用户明确指定用「安岳柠檬」这一瓶 */
+        val r = recipe("daiquiri")
+        val sub = subs.first { it.fromId == "lime" && it.toId == "lemon" }
+        val picked = store.bottles.first { it.id == "b-lemon-安岳柠檬" }
+        val plan = inventory.planPour(
+            r, 1, ingredients,
+            overrides = mapOf("lime" to picked.id),
+            chosenSubs = mapOf("lime" to sub.toId)
+        )
+        assertTrue("计划应可执行", plan.ok)
+        val line = plan.lines.firstOrNull { it.targetId == "lemon" }
+        assertNotNull("替代行（目标为黄柠檬）应存在", line)
+        /* 用户挑的那瓶必须排在最前并被真正取用 —— 此前 override 按 targetId 取，用户选择被静默丢弃 */
+        assertEquals(picked.id, line!!.picks.first().first.id)
+    }
+
+    /** 可选/装饰材料的非换算单位应按「本次不加」跳过，而不是让整杯失败 */
+    @Test fun optionalNonConvertibleUnitIsSkippedNotFailed() {
+        val r = recipe("bees-knees")   // 装饰用 1 片皮橙皮
+        assertTrue(r.ingredients.any { it.unit == "片皮" })
+        assertTrue(r.ingredients.filter { it.unit == "片皮" }.all { it.role != IngredientRole.REQUIRED })
+    }
+
+    /** 调制记录的 startedAt 来自草稿创建时间，不再恒等于 finishedAt */
+    @Test fun sessionStartComesFromDraft() = runTest {
+        val recipeId = "dry-martini"
+        val created = System.currentTimeMillis() - 10L * 60 * 1000
+        val draft = MixDraft(sessionId = "sess-1", recipeId = recipeId, servings = 1, createdAt = created)
+        val res = inventory.commitMix(
+            sessionId = draft.sessionId, recipe = recipe(recipeId), servings = 1,
+            ingredients = ingredients, startedAt = draft.createdAt
+        )
+        assertTrue(res is CommitResult.Success)
+        val session = (res as CommitResult.Success).session
+        assertEquals(created, session.startedAt)
+        assertTrue(session.finishedAt!! > session.startedAt)
+    }
+
+    /** 补货建议不再漏掉克（g）类材料：模拟瓶改用材料自身单位 */
+    @Test fun unlockRankingIncludesMassIngredients() = runTest {
+        val rows = recommender.unlockRanking(recipes, ingredients)
+        assertTrue(rows.isNotEmpty())
+        rows.forEach { assertTrue(it.gain > 0) }
+    }
+
+    /** 「只差一种材料」的补货模拟对克（g）类必需材料有效：模拟补货后杯数不为 0
+        （DiscoverScreen 旧实现把非「个」材料的模拟瓶一律当 ml，MASS 换算返回 null → 恒显示「能调 0 杯」） */
+    @Test fun restockSimulationCountsMassIngredient() = runTest {
+        /* porn-star-martini 必需：vanilla_vodka/passion_fruit_liqueur/passion_fruit_puree/vanilla_sugar/champagne。
+           补齐除 vanilla_sugar（8 g/杯）外的全部必需材料，使其成为唯一缺口 */
+        store.bottles.add(bottle("vanilla_vodka", "绝对香草", 700.0, 700.0, opened = false))
+        store.bottles.add(bottle("passion_fruit_liqueur", "百香利口", 500.0, 500.0, opened = false))
+        store.bottles.add(bottle("passion_fruit_puree", "百香果果泥", 500.0, 500.0, opened = false))
+        store.bottles.add(bottle("champagne", "干型香槟", 750.0, 750.0, opened = false))
+        val r = recipe("porn-star-martini")
+        val before = matchEngine.match(r, 1, ingredients)
+        assertEquals(RecipeStatus.MISSING, before.status)
+        assertEquals(listOf("vanilla_sugar"), before.missing.map { it.def.id })
+        val cups = recommender.cupsIfRestocked(r, ingredients.getValue("vanilla_sugar"), ingredients)
+        assertTrue("模拟补货 vanilla_sugar（g）后杯数不应为 0", cups > 0)
     }
 
     @Test fun volumeUnitConversions() {

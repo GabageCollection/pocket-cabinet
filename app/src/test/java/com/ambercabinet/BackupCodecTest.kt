@@ -20,7 +20,7 @@ class BackupCodecTest {
     )
 
     private fun session(id: String) = SessionEntity(
-        id, "dry-martini", 1, "done", false, 0, "{}", "{}", 1L, 2L, "干马丁尼", "Dry Martini", "cocktail", ""
+        id, "dry-martini", 1, false, "{}", "{}", 1L, 2L, "干马丁尼", "Dry Martini", "cocktail", ""
     )
 
     @Test fun zipRoundTrip() {
@@ -171,5 +171,64 @@ class BackupCodecTest {
         )))
         assertEquals(5L, s.exportedAt)
         assertEquals(1, s.counts["bottles"])
+    }
+
+    /* ── 回归：归档酒瓶的备份必须自洽 ── */
+
+    /**
+     * 归档（软删除）过的酒瓶仍会随备份导出（含 deleted=true），
+     * 否则它的历史流水会成为悬空关联，导致整份备份无法恢复。
+     */
+    @Test fun archivedBottleBackupIsSelfConsistent() {
+        val archived = bottle("b2", 100.0).copy(deleted = true)
+        val bundle = BackupCodec.Bundle(
+            bottles = listOf(bottle("b1", 500.0), archived),
+            txns = listOf(txn("t1", "b1", null), txn("t2", "b2", null))
+        )
+        val decoded = BackupCodec.decode(BackupCodec.encode(bundle))
+        assertEquals(2, decoded.bottles.size)
+        assertTrue(decoded.bottles.any { it.id == "b2" && it.deleted })
+        assertEquals(2, decoded.txns.size)
+    }
+
+    /** 导出时照片必须真的进入备份，否则 photoUri 上的 backup-photo: 标记会成为悬空指针 */
+    @Test fun photosAreCarriedInBackup() {
+        val withPhoto = bottle("b1", 100.0).copy(photoUri = "backup-photo:photos/bottle-b1.jpg")
+        val bundle = BackupCodec.Bundle(
+            bottles = listOf(withPhoto),
+            photos = mapOf("photos/bottle-b1.jpg" to byteArrayOf(1, 2, 3)),
+            exportedAt = 1L
+        )
+        val decoded = BackupCodec.decode(BackupCodec.encode(bundle))
+        assertEquals(1, decoded.photos.size)
+        assertEquals(3, decoded.photos.values.first().size)
+        assertEquals("backup-photo:photos/bottle-b1.jpg", decoded.bottles[0].photoUri)
+    }
+
+    /** schema>1 但缺少 kv 段的备份视为不完整（截断/拼接文件） */
+    @Test fun missingKvSectionRejected() {
+        val data = org.json.JSONObject()
+            .put("bottles", org.json.JSONArray()).put("txns", org.json.JSONArray())
+            .put("sessions", org.json.JSONArray()).put("notes", org.json.JSONArray())
+            .put("favorites", org.json.JSONArray()).put("customRecipes", org.json.JSONArray())
+            .put("customIngredients", org.json.JSONArray())
+        val dataBytes = data.toString().toByteArray(Charsets.UTF_8)
+        val md = java.security.MessageDigest.getInstance("SHA-256").digest(dataBytes)
+        val checksum = md.joinToString("") { "%02x".format(it) }
+        val out = ByteArrayOutputStream()
+        ZipOutputStream(out).use { zip ->
+            zip.putNextEntry(ZipEntry("manifest.json"))
+            zip.write(org.json.JSONObject()
+                .put("app", "amber-cabinet").put("schemaVersion", 2)
+                .put("exportedAt", 1L).put("checksum", checksum).toString().toByteArray())
+            zip.closeEntry()
+            zip.putNextEntry(ZipEntry("backup.json")); zip.write(dataBytes); zip.closeEntry()
+        }
+        try {
+            BackupCodec.decode(out.toByteArray())
+            fail("缺少 kv 段的备份应被拒绝")
+        } catch (e: BackupCodec.Invalid) {
+            assertTrue(e.message!!.contains("不完整"))
+        }
     }
 }

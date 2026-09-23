@@ -1,8 +1,9 @@
 package com.ambercabinet.core.data.seed
 
 import android.content.Context
+import com.ambercabinet.core.data.repo.RecipeJson
 import com.ambercabinet.core.model.*
-import org.json.JSONArray
+import com.ambercabinet.core.units.Units
 import org.json.JSONObject
 
 /**
@@ -17,6 +18,16 @@ class SeedCatalog(
     val brands: List<Brand>
 ) {
     companion object {
+        /** 步骤里允许出现的说明性用量（无数量意义，不参与换算与扣减） */
+        private val DESCRIPTIVE_UNITS = setOf("适量", "少许", "可省")
+
+        /** 步骤用量单位是否已知：允许「dash（可省）」这类在已知单位后附注的写法 */
+        private fun isKnownNeedUnit(raw: String): Boolean {
+            if (raw in Units.ALL_UNITS || raw in DESCRIPTIVE_UNITS) return true
+            val base = raw.substringBefore('（').trim()
+            return base in Units.ALL_UNITS || base in DESCRIPTIVE_UNITS
+        }
+
         /** 不依赖 Context 的解析入口（供 JVM 单元测试与导入校验使用） */
         fun parse(ingredientsJson: String, substitutionsJson: String, brandsJson: String, recipesJson: String): SeedCatalog {
             val ingredients = parseIngredients(JSONObject(ingredientsJson))
@@ -115,44 +126,30 @@ class SeedCatalog(
                 val o = arr.getJSONObject(i)
                 val id = o.getString("id")
                 require(ids.add(id)) { "重复配方 ID: " + id }
+                /* 材料行/步骤解析与私人配方共用 RecipeJson（同 schema），这里额外做引用完整性校验 */
                 val ingArr = o.getJSONArray("ingredients")
-                val recipeIngredients = (0 until ingArr.length()).map { j ->
-                    val ri = ingArr.getJSONObject(j)
-                    val ingId = ri.getString("ing")
+                for (j in 0 until ingArr.length()) {
+                    val ingId = ingArr.getJSONObject(j).getString("ing")
                     require(ingredients.containsKey(ingId)) { "配方 " + id + " 引用了未知材料: " + ingId }
-                    RecipeIngredient(
-                        ingredientId = ingId,
-                        qty = ri.optDouble("qty", 0.0),
-                        unit = ri.getString("unit"),
-                        role = when (ri.getString("role")) {
-                            "optional" -> IngredientRole.OPTIONAL
-                            "garnish" -> IngredientRole.GARNISH
-                            else -> IngredientRole.REQUIRED
-                        },
-                        substitutable = ri.optBoolean("substitutable", true),
-                        note = if (ri.has("note")) ri.getString("note") else null,
-                        freeText = if (ri.has("freeText")) ri.getString("freeText") else null
-                    )
                 }
+                val recipeIngredients = RecipeJson.ingredients(o)
                 require(recipeIngredients.any { it.role == IngredientRole.REQUIRED }) {
                     "配方 " + id + " 缺少必需材料"
                 }
-                val stepArr = o.getJSONArray("steps")
-                val steps = (0 until stepArr.length()).map { j ->
-                    val s = stepArr.getJSONObject(j)
-                    val needArr = s.optJSONArray("need") ?: JSONArray()
-                    val needs = (0 until needArr.length()).map { k ->
-                        val n = needArr.getJSONArray(k)
-                        Triple(n.getString(0), n.optDouble(1, 0.0), n.getString(2))
+                val steps = RecipeJson.steps(o)
+                /* 单位白名单校验：材料行的单位必须落在已知单位里（否则匹配/扣减会静默失败） */
+                recipeIngredients.forEach { ri ->
+                    require(ri.unit in Units.ALL_UNITS) {
+                        "配方 " + id + " 的材料「" + ri.ingredientId + "」使用了未知单位：" + ri.unit
                     }
-                    RecipeStep(
-                        title = s.getString("t"),
-                        detail = s.getString("d"),
-                        needs = needs,
-                        timerSeconds = s.optInt("timer", 0),
-                        timerLabel = if (s.has("timerLabel")) s.getString("timerLabel") else null,
-                        visual = s.optInt("vis", 0)
-                    )
+                }
+                /* 步骤内的用量单位：允许「适量/少许」等说明性用量，以及「dash（可省）」这类带备注写法 */
+                steps.forEach { st ->
+                    st.needs.forEach { n ->
+                        require(isKnownNeedUnit(n.unit)) {
+                            "配方 " + id + " 的步骤用量使用了未知单位：" + n.unit
+                        }
+                    }
                 }
                 /* 过敏原自动聚合（§13） */
                 val allergens = recipeIngredients

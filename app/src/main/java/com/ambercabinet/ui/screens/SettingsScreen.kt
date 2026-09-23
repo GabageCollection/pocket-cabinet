@@ -6,29 +6,30 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.NavHostController
+import com.ambercabinet.core.data.prefs.UserPrefs
 import com.ambercabinet.core.data.repo.BackupCodec
 import com.ambercabinet.core.data.repo.BackupService
 import com.ambercabinet.core.data.repo.CabinetRepository
 import com.ambercabinet.core.data.repo.CatalogRepository
+import com.ambercabinet.ui.components.AmberTopBar
+import com.ambercabinet.ui.components.InfoRow
+import com.ambercabinet.ui.components.MessageDialog
+import com.ambercabinet.ui.components.rememberDateFmt
 import com.ambercabinet.ui.theme.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
 import java.util.Date
-import java.util.Locale
 import javax.inject.Inject
 
 data class SettingsState(
@@ -50,26 +51,30 @@ data class SettingsState(
 class SettingsViewModel @Inject constructor(
     private val cabinet: CabinetRepository,
     private val catalog: CatalogRepository,
-    private val backup: BackupService
+    private val backup: BackupService,
+    private val userPrefs: UserPrefs
 ) : ViewModel() {
     private val busy = MutableStateFlow(false)
     private val msg = MutableStateFlow<String?>(null)
     private val pending = MutableStateFlow<Pair<BackupCodec.Summary, android.net.Uri>?>(null)
     private val hasSnapshot = MutableStateFlow(backup.hasSnapshot)
 
-    val state: StateFlow<SettingsState> = combine(
+    private val counts = combine(
         cabinet.bottles, cabinet.sessions, cabinet.transactions, cabinet.allRecipes, catalog.customIngredients
     ) { b, s, t, r, ci -> Counts(b.size, s.size, t.size, r.size, r.count { it.isUser }, ci.size) }
-        .combine(combine(busy, msg, pending, hasSnapshot) { bz, m, p, hs -> Quad(bz, m, p, hs) }) { c, q ->
-            SettingsState(
-                bottleCount = c.bottles, sessionCount = c.sessions, txnCount = c.txns,
-                recipeCount = c.recipes, privateRecipeCount = c.privateRecipes, customIngredientCount = c.customIngs,
-                seedVersion = catalog.catalog.version,
-                busy = q.busy, msg = q.msg,
-                pendingSummary = q.pending?.first, pendingUri = q.pending?.second,
-                hasSnapshot = q.hasSnapshot
-            )
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SettingsState())
+
+    private val uiFlags = combine(busy, msg, pending, hasSnapshot) { bz, m, p, hs -> Quad(bz, m, p, hs) }
+
+    val state: StateFlow<SettingsState> = combine(counts, uiFlags) { c, q ->
+        SettingsState(
+            bottleCount = c.bottles, sessionCount = c.sessions, txnCount = c.txns,
+            recipeCount = c.recipes, privateRecipeCount = c.privateRecipes, customIngredientCount = c.customIngs,
+            seedVersion = catalog.catalog.version,
+            busy = q.busy, msg = q.msg,
+            pendingSummary = q.pending?.first, pendingUri = q.pending?.second,
+            hasSnapshot = q.hasSnapshot
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SettingsState())
 
     private data class Counts(val bottles: Int, val sessions: Int, val txns: Int, val recipes: Int, val privateRecipes: Int, val customIngs: Int)
     private data class Quad(val busy: Boolean, val msg: String?, val pending: Pair<BackupCodec.Summary, android.net.Uri>?, val hasSnapshot: Boolean)
@@ -79,6 +84,7 @@ class SettingsViewModel @Inject constructor(
             busy.value = true
             val ok = try { backup.exportTo(uri) } catch (e: Exception) { false }
             busy.value = false
+            if (ok) userPrefs.lastBackupAt = System.currentTimeMillis()
             msg.value = if (ok) "备份好了，文件在你选的位置" else "没导出成：选的位置写不进去，换一个试试"
         }
     }
@@ -126,11 +132,12 @@ class SettingsViewModel @Inject constructor(
     fun clearMsg() { msg.value = null }
 }
 
-private val settingsDateFmt = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.CHINA)
 
 @Composable
 fun SettingsScreen(nav: NavHostController, vm: SettingsViewModel = hiltViewModel()) {
-    val s by vm.state.collectAsState()
+    val s by vm.state.collectAsStateWithLifecycle()
+    /* SimpleDateFormat 非线程安全，在组合期建随屏幕销毁的实例 */
+    val settingsDateFmt = rememberDateFmt("yyyy-MM-dd HH:mm")
 
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
         uri?.let { vm.export(it) }
@@ -141,12 +148,7 @@ fun SettingsScreen(nav: NavHostController, vm: SettingsViewModel = hiltViewModel
 
     Scaffold(
         containerColor = Bg,
-        topBar = {
-            Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { nav.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", tint = Fg) }
-                Text("设置", fontSize = 18.sp, color = Fg)
-            }
-        }
+        topBar = { AmberTopBar("设置", onBack = { nav.popBackStack() }) }
     ) { padding ->
         Column(Modifier.padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
 
@@ -175,12 +177,12 @@ fun SettingsScreen(nav: NavHostController, vm: SettingsViewModel = hiltViewModel
             }
 
             SectionHead("数据")
-            SettingsRow("内置配方", s.recipeCount.let { (it - s.privateRecipeCount).toString() } + " 款（配方库版本 " + s.seedVersion + "）")
-            SettingsRow("私人配方", s.privateRecipeCount.toString() + " 款")
-            SettingsRow("自定义材料", s.customIngredientCount.toString() + " 种")
-            SettingsRow("酒柜", s.bottleCount.toString() + " 瓶")
-            SettingsRow("调制记录", s.sessionCount.toString() + " 次")
-            SettingsRow("进出记录", s.txnCount.toString() + " 条")
+            InfoRow("内置配方", (s.recipeCount - s.privateRecipeCount).toString() + " 款（配方库版本 " + s.seedVersion + "）", Fg, Muted, 14)
+            InfoRow("私人配方", s.privateRecipeCount.toString() + " 款", Fg, Muted, 14)
+            InfoRow("自定义材料", s.customIngredientCount.toString() + " 种", Fg, Muted, 14)
+            InfoRow("酒柜", s.bottleCount.toString() + " 瓶", Fg, Muted, 14)
+            InfoRow("调制记录", s.sessionCount.toString() + " 次", Fg, Muted, 14)
+            InfoRow("进出记录", s.txnCount.toString() + " 条", Fg, Muted, 14)
 
             SectionHead("关于")
             Text("口袋酒柜 · 完全离线的家庭调酒与定量酒柜", color = Muted, fontSize = 13.sp)
@@ -202,7 +204,7 @@ fun SettingsScreen(nav: NavHostController, vm: SettingsViewModel = hiltViewModel
                         "酒瓶 " + (sum.counts["bottles"] ?: 0) + " · 进出记录 " + (sum.counts["txns"] ?: 0) +
                             " · 调制记录 " + (sum.counts["sessions"] ?: 0) + " · 笔记 " + (sum.counts["notes"] ?: 0) +
                             " · 私人配方 " + (sum.counts["customRecipes"] ?: 0) + " · 自定义材料 " + (sum.counts["customIngredients"] ?: 0) +
-                            " · 收藏 " + (sum.counts["favorites"] ?: 0) + " · 照片 " + sum.photoCount,
+                            " · 收藏 " + (sum.counts["favorites"] ?: 0),
                         color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp)
                     )
                     Text(
@@ -221,20 +223,5 @@ fun SettingsScreen(nav: NavHostController, vm: SettingsViewModel = hiltViewModel
         )
     }
 
-    s.msg?.let { m ->
-        AlertDialog(
-            onDismissRequest = { vm.clearMsg() },
-            confirmButton = { TextButton(onClick = { vm.clearMsg() }) { Text("知道了", color = Accent) } },
-            text = { Text(m) },
-            containerColor = Raised
-        )
-    }
-}
-
-@Composable
-private fun SettingsRow(label: String, value: String) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, color = Fg, fontSize = 14.sp)
-        Text(value, color = Muted, fontSize = 13.sp)
-    }
+    MessageDialog(s.msg, vm::clearMsg)
 }

@@ -1,6 +1,7 @@
 package com.ambercabinet.core.domain
 
 import com.ambercabinet.core.model.*
+import com.ambercabinet.core.units.Units
 
 data class Recommendation(
     val recipe: Recipe,
@@ -15,12 +16,17 @@ class RecommendationEngine(
     private val store: InventoryStore,
     private val matchEngine: MatchEngine
 ) {
-    /** §8：确定性可解释排序 */
+    /**
+     * §8：确定性可解释排序。
+     * @param matched 调用方已算好的 (配方, match) 列表，避免在同一快照上重复计算
+     * @param notesByRecipe 品鉴笔记按配方分组：均分偏离 3 星线性加减分；全部笔记的甜/酸/苦
+     *        均值 ≥3.5 视为口味倾向，带对应风味标签的配方小幅加分（清爽/浓烈不参与）
+     */
     suspend fun recommend(
-        recipes: List<Recipe>,
-        ingredients: Map<String, Ingredient>,
+        matched: List<Pair<Recipe, MatchResult>>,
         favorites: Set<String>,
-        recentRecipeIds: Set<String>
+        recentRecipeIds: Set<String>,
+        notesByRecipe: Map<String, List<TastingNote>> = emptyMap()
     ): List<Recommendation> {
         val agedThreshold = 25L * 86400000
         val now = System.currentTimeMillis()
@@ -28,14 +34,40 @@ class RecommendationEngine(
             .filter { it.openedAt != null && now - it.openedAt!! > agedThreshold }
             .associateBy { it.ingredientId }
 
-        return recipes.mapNotNull { r ->
-            val m = matchEngine.match(r, 1, ingredients)
+        val allNotes = notesByRecipe.values.flatten()
+        fun dimMean(extract: (TastingNote) -> Int?): Double? {
+            val vals = allNotes.mapNotNull(extract)
+            return if (vals.isEmpty()) null else vals.average()
+        }
+        /* 口味倾向：甜/酸/苦各自非空均值 ≥3.5 的维度（5 分制） */
+        val AFFINITY_ZH = mapOf("sweet" to "甜", "sour" to "酸", "bitter" to "苦")
+        val affinity = listOf(
+            "sweet" to dimMean { it.sweet },
+            "sour" to dimMean { it.sour },
+            "bitter" to dimMean { it.bitter }
+        ).filter { it.second != null && it.second!! >= 3.5 }
+
+        return matched.mapNotNull { (r, m) ->
             var score = 0.0
             val reasons = mutableListOf<String>()
             when (m.status) {
                 RecipeStatus.OK -> { score += 1000; reasons.add("材料齐全，无需替代") }
                 RecipeStatus.SUBSTITUTABLE -> { score += 600; reasons.add("使用已有替代材料可调") }
                 else -> return@mapNotNull null
+            }
+            /* 品鉴评分反哺：均分每偏离 3 星 1 分 ±120，高分/低分都要让用户在推荐理由里看到 */
+            val notes = notesByRecipe[r.id]
+            if (notes != null && notes.isNotEmpty()) {
+                val avg = notes.map { it.rating }.average()
+                score += ((avg - 3.0) * 120).toInt()
+                if (avg >= 4.0 || avg <= 2.0) reasons.add("你给它打过 " + String.format("%.1f", avg) + " 星")
+            }
+            /* 风味亲和：口味倾向维度命中配方风味标签 +40 */
+            for ((dim, _) in affinity) {
+                if (r.flavors.contains(dim)) {
+                    score += 40
+                    reasons.add("合你偏" + AFFINITY_ZH[dim] + "的口味")
+                }
             }
             score += minOf(m.maxCups, 20) * 10
             reasons.add("当前库存最多可调 " + m.maxCups + " 杯")
@@ -44,14 +76,17 @@ class RecommendationEngine(
             if (agedHit != null) {
                 score += 80
                 val b = aged[agedHit.ingredientId]!!
-                reasons.add(b.brand + "仅剩 " + (if (b.unit == "ml") Units0.fmt(b.remaining) + " ml" else Units0.fmt(b.remaining) + " " + b.unit) + "，优先消耗")
+                reasons.add(b.brand + "仅剩 " + Units.fmt(b.remaining) + " " + b.unit + "，优先消耗")
             }
             if (recentRecipeIds.contains(r.id)) score -= 200  // 重复抑制
             Recommendation(r, m, score, reasons.take(3))
         }.sortedByDescending { it.score }
     }
 
-    /** §8「补一瓶酒」：对缺失核心材料逐项加入模拟，按新增解锁数排序 */
+    /**
+     * §8「补一瓶酒」：对缺失核心材料逐项加入模拟，按新增解锁数排序。
+     * baseOk 只算一次；每个候选只重测「当前不可调且确实引用该材料」的配方。
+     */
     suspend fun unlockRanking(
         recipes: List<Recipe>,
         ingredients: Map<String, Ingredient>
@@ -60,56 +95,49 @@ class RecommendationEngine(
         val simStore = SimStore(store.allBottles().toMutableList())
         val simEngine = MatchEngine(simStore, matchEngine.substitutionsAll())
 
+        /* 一次全量匹配：得到 baseOk 集合 + 收集缺失候选 */
+        val notOk = mutableListOf<Recipe>()
         for (r in recipes) {
             val m = simEngine.match(r, 1, ingredients)
             if (m.status == RecipeStatus.OK) continue
+            notOk.add(r)
             for (mi in m.missing) {
                 if (!mi.def.staple && mi.ri.role == IngredientRole.REQUIRED) candidates[mi.def.id] = mi.def
             }
         }
-        val baseOk = recipes.count { simEngine.match(it, 1, ingredients).status == RecipeStatus.OK }
         return candidates.values.map { def ->
             simStore.simulate(def)
-            val gain = recipes.count { simEngine.match(it, 1, ingredients).status == RecipeStatus.OK } - baseOk
+            /* 候选材料不在配方里，其状态不可能从非 OK 变 OK：只测受影响的配方 */
+            val affected = notOk.filter { r -> r.ingredients.any { it.ingredientId == def.id } }
+            val gain = affected.count { simEngine.match(it, 1, ingredients).status == RecipeStatus.OK }
             simStore.clearSim()
             UnlockRow(def, gain)
         }.filter { it.gain > 0 }.sortedByDescending { it.gain }
     }
 
-    /** 每瓶统计：可调的配方数与最佳杯数 */
-    suspend fun bottleUsage(
-        bottle: Bottle,
-        recipes: List<Recipe>,
-        ingredients: Map<String, Ingredient>
-    ): Pair<Int, Int> {
-        var n = 0
-        var best = 0
-        for (r in recipes) {
-            val ri = r.ingredients.firstOrNull { it.ingredientId == bottle.ingredientId && it.role == IngredientRole.REQUIRED } ?: continue
-            val m = matchEngine.match(r, 1, ingredients)
-            if (m.status == RecipeStatus.OK || m.status == RecipeStatus.SUBSTITUTABLE) {
-                n++
-                val def = ingredients[bottle.ingredientId] ?: continue
-                val need = Units0.needInStockUnit(def, ri.qty, ri.unit, bottle.unit)
-                if (need != null) best = maxOf(best, Math.floor(bottle.remaining / need).toInt())
-            }
-        }
-        return n to best
+    /**
+     * 「只差一种材料」补齐后可调杯数：在库存副本上加入模拟瓶重测。
+     * 模拟瓶必须按材料自身默认单位入库（同 SimStore.simulate 的注释）：
+     * 非 COUNT 一律给 "ml" 会让 MASS（g）材料的换算返回 null，杯数恒为 0。
+     */
+    suspend fun cupsIfRestocked(recipe: Recipe, def: Ingredient, ingredients: Map<String, Ingredient>): Int {
+        val simStore = SimStore(store.allBottles().toMutableList())
+        simStore.simulate(def)
+        return MatchEngine(simStore, matchEngine.substitutionsAll()).match(recipe, 1, ingredients).maxCups
     }
 
     private class SimStore(val bottles: MutableList<Bottle>) : InventoryStore {
-        override suspend fun bottlesFor(ingredientId: String) = bottles.filter { it.ingredientId == ingredientId }
-        override suspend fun allBottles() = bottles.toList()
+        override suspend fun bottlesFor(ingredientId: String) = bottles.filter { it.ingredientId == ingredientId && !it.deleted }
+        override suspend fun allBottles() = bottles.filter { !it.deleted }
         override suspend fun lastBottleFor(recipeId: String, ingredientId: String): String? = null
         fun simulate(def: Ingredient) {
+            /* 模拟瓶按材料自己的默认单位入库：这样 needInStockUnit 的换算路径与真实瓶一致。
+               此前非 COUNT 一律给 "ml"，导致 MASS（g）材料换算必然返回 null、永远进不了补货建议 */
             bottles.add(Bottle(
                 id = "__sim__" + def.id, ingredientId = def.id, brand = "", initQty = 9999.0,
-                remaining = 9999.0, unit = if (def.dimension == UnitDimension.COUNT) def.unit else "ml"
+                remaining = 9999.0, unit = def.unit
             ))
         }
         fun clearSim() { bottles.removeAll { it.id.startsWith("__sim__") } }
     }
 }
-
-/** 内部别名，避免与 model 层混淆 */
-private typealias Units0 = com.ambercabinet.core.units.Units

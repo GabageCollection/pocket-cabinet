@@ -236,9 +236,6 @@
    "liquid": "oklch(0.78 0.11 85)",
    "abv": 20,
    "timeMin": 4,
-   "allergens": [
-    "蛋"
-   ],
    "ingredients": [
     {
      "ing": "bourbon",

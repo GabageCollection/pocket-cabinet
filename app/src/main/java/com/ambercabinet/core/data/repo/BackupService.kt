@@ -2,13 +2,11 @@ package com.ambercabinet.core.data.repo
 
 import android.content.Context
 import android.net.Uri
-import androidx.room.withTransaction
 import com.ambercabinet.core.data.db.AppDatabase
-import com.ambercabinet.core.data.db.BottleEntity
-import com.ambercabinet.core.data.db.NoteEntity
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -57,6 +55,7 @@ class BackupService @Inject constructor(
             customRecipes = db.customRecipeDao().getAll(),
             customIngredients = db.customIngredientDao().getAll(),
             kv = db.kvDao().getAll(),
+            photos = photos,
             exportedAt = System.currentTimeMillis()
         )
     }
@@ -80,16 +79,7 @@ class BackupService @Inject constructor(
             val bundle = BackupCodec.decode(readCapped(uri))          /* 全部校验通过才继续 */
             writeSnapshot()                                            /* 快照失败 → 抛错中止 */
             applyBundle(bundle)
-            BackupCodec.Summary(
-                exportedAt = bundle.exportedAt,
-                schemaVersion = bundle.schemaVersion,
-                counts = mapOf(
-                    "bottles" to bundle.bottles.size, "txns" to bundle.txns.size, "sessions" to bundle.sessions.size,
-                    "notes" to bundle.notes.size, "favorites" to bundle.favorites.size,
-                    "customRecipes" to bundle.customRecipes.size, "customIngredients" to bundle.customIngredients.size
-                ),
-                photoCount = bundle.photos.size
-            )
+            bundle.toSummary()
         }
     }
 
@@ -138,9 +128,10 @@ class BackupService @Inject constructor(
     }
 
     private fun readCapped(uri: Uri): ByteArray {
-        val cap = 80L * 1024 * 1024
+        /* 上限与 BackupCodec.decode 的文件上限一致（65 MiB），避免先整体读入再被拒 */
+        val cap = 65L * 1024 * 1024
         appContext.contentResolver.openInputStream(uri)?.use { input ->
-            val out = java.io.ByteArrayOutputStream()
+            val out = ByteArrayOutputStream()
             val buf = ByteArray(64 * 1024)
             var total = 0L
             while (true) {

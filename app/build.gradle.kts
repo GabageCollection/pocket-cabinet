@@ -23,9 +23,9 @@ android {
         applicationId = "com.ambercabinet"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        versionCode = 2
+        versionName = "1.1.0"
+        /* 无 androidTest 源集（界面测试未编写），不配置 testInstrumentationRunner */
         vectorDrawables { useSupportLibrary = true }
     }
 
@@ -76,7 +76,6 @@ kotlin {
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2024.10.01")
     implementation(composeBom)
-    androidTestImplementation(composeBom)
 
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.activity:activity-compose:1.9.3")
@@ -95,9 +94,6 @@ dependencies {
     implementation("androidx.room:room-ktx:2.6.1")
     ksp("androidx.room:room-compiler:2.6.1")
 
-    // DataStore
-    implementation("androidx.datastore:datastore-preferences:1.1.1")
-
     // Hilt
     implementation("com.google.dagger:hilt-android:2.51.1")
     ksp("com.google.dagger:hilt-android-compiler:2.51.1")
@@ -109,13 +105,9 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
-    testImplementation("app.cash.turbine:turbine:1.1.0")
-    testImplementation("androidx.room:room-testing:2.6.1")
     /* 真实 Room + SQLite（JDBC）JVM 事务测试 */
     testImplementation("org.xerial:sqlite-jdbc:3.44.1.0")
     testImplementation("io.mockk:mockk-jvm:1.13.12")
-    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
-    debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
 
 // Room schema 导出（配合 @Database(exportSchema = true)，schema JSON 存入 app/schemas）

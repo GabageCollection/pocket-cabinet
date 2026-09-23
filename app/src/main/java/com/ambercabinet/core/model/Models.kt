@@ -36,10 +36,13 @@ data class RecipeIngredient(
     val freeText: String? = null   // 如「适量」冰块
 )
 
+/** 步骤内声明的单杯用量（ingredientId, 数量, 单位） */
+data class StepNeed(val ingredientId: String, val qty: Double, val unit: String)
+
 data class RecipeStep(
     val title: String,
     val detail: String,
-    val needs: List<Triple<String, Double, String>> = emptyList(), // (ingredientId, 单杯用量, 单位)
+    val needs: List<StepNeed> = emptyList(),
     val timerSeconds: Int = 0,
     val timerLabel: String? = null,
     val visual: Int = 0
@@ -118,9 +121,8 @@ data class MixSession(
     val id: String = UUID.randomUUID().toString(),
     val recipeId: String,
     val servings: Int,
-    val status: String = "done",   // done（草稿不进入本表）
+    /* 本表只保存已完成的调制（草稿在 mix_drafts），因此不再有 status 字段 */
     val undone: Boolean = false,
-    val currentStep: Int = 0,
     /** 已确认的替代：原材料 ID → 替代材料 ID（明确规则标识，非布尔） */
     val chosenSubs: Map<String, String> = emptyMap(),
     val bottleOverrides: Map<String, String> = emptyMap(),
@@ -145,6 +147,7 @@ data class MixDraft(
     val timerEndAt: Long? = null,   // 运行中：明确的到期时间基准（不依赖每秒减一）
     val timerRemainingSec: Int = 0, // 暂停/未启动：剩余秒数
     val timerRunning: Boolean = false,
+    val timerStep: Int = -1,        // 计时所属步骤；-1 = 旧草稿未记录，按当前步处理
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 )
@@ -161,11 +164,6 @@ data class TastingNote(
     val text: String = "",
     val photoUri: String? = null,
     val createdAt: Long = System.currentTimeMillis()
-)
-
-data class Favorite(
-    val recipeId: String,
-    val time: Long = System.currentTimeMillis()
 )
 
 data class Brand(

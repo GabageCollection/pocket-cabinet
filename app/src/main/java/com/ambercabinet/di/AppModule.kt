@@ -6,7 +6,6 @@ import com.ambercabinet.core.data.db.AppDatabase
 import com.ambercabinet.core.data.seed.SeedCatalog
 import com.ambercabinet.core.domain.InventoryService
 import com.ambercabinet.core.domain.MatchEngine
-import com.ambercabinet.core.domain.RecommendationEngine
 import com.ambercabinet.core.data.repo.CabinetRepository
 import dagger.Module
 import dagger.Provides
@@ -40,9 +39,4 @@ object AppModule {
     @Singleton
     fun provideInventoryService(repo: CabinetRepository, matchEngine: MatchEngine): InventoryService =
         InventoryService(repo, repo, matchEngine)
-
-    @Provides
-    @Singleton
-    fun provideRecommendationEngine(repo: CabinetRepository, matchEngine: MatchEngine): RecommendationEngine =
-        RecommendationEngine(repo, matchEngine)
 }

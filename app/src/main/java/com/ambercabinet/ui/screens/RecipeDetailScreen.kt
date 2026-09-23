@@ -1,5 +1,14 @@
 package com.ambercabinet.ui.screens
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -12,11 +21,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.NavHostController
 import com.ambercabinet.core.data.repo.CabinetRepository
@@ -25,13 +36,15 @@ import com.ambercabinet.core.data.repo.RecordsRepository
 import com.ambercabinet.core.domain.MatchEngine
 import com.ambercabinet.core.domain.MatchResult
 import com.ambercabinet.core.domain.SnapshotStore
-import com.ambercabinet.core.domain.SubChoice
 import com.ambercabinet.core.model.*
 import com.ambercabinet.core.units.Units
 import com.ambercabinet.ui.components.*
+import com.ambercabinet.ui.nav.LocalAmberAnimScope
+import com.ambercabinet.ui.nav.LocalAmberSharedScope
 import com.ambercabinet.ui.nav.Routes
 import com.ambercabinet.ui.theme.*
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -51,7 +64,10 @@ data class DetailState(
     val bottlesOf: Map<String, List<Bottle>> = emptyMap(),
     val existingDraft: MixDraft? = null,
     val createdDraftId: String? = null,
-    val starting: Boolean = false
+    val starting: Boolean = false,
+    val error: String? = null,
+    /** 是否已经算过一轮：false 才是加载中；loaded 为 true 但 recipe 为空 = 这个配方确实不存在 */
+    val loaded: Boolean = false
 )
 
 @HiltViewModel
@@ -69,32 +85,41 @@ class DetailViewModel @Inject constructor(
     private val subSheetFor = MutableStateFlow<String?>(null)
     private val createdDraftId = MutableStateFlow<String?>(null)
     private val starting = MutableStateFlow(false)
+    private val errorMessage = MutableStateFlow<String?>(null)
 
     private data class Prefs(
         val overrides: Map<String, String>,
         val chosenSubs: Map<String, String>,
         val sheetFor: String?,
-        val subSheetFor: String?
+        val subSheetFor: String?,
+        val starting: Boolean,
+        val error: String?
     )
 
-    private val prefs = combine(overrides, chosenSubs, sheetFor, subSheetFor) { o, c, s, ss -> Prefs(o, c, s, ss) }
+    /* starting 必须是 combine 输入，否则「正在准备…」状态不具响应性；error 同理。
+       combine 最多 5 个流，6 个要分两层。 */
+    private val prefsCore = combine(overrides, chosenSubs, sheetFor, subSheetFor, starting) { o, c, s, ss, st ->
+        Prefs(o, c, s, ss, st, null)
+    }
+    private val prefs = combine(prefsCore, errorMessage) { p, e -> p.copy(error = e) }
     private val base = combine(cabinet.allRecipes, cabinet.bottles, records.favorites, catalog.allIngredients) { r, b, f, i -> Base(r, b, f, i) }
 
     private data class Base(val recipes: List<Recipe>, val bottles: List<Bottle>, val favs: Set<String>, val ings: Map<String, Ingredient>)
 
     val state: StateFlow<DetailState> = combine(base, cups, prefs, cabinet.latestDraft, createdDraftId) { b, cupsRaw, p, draft, created ->
-        val recipe = b.recipes.firstOrNull { it.id == recipeId } ?: return@combine DetailState()
+        /* 查不到也要给 loaded = true，否则界面只看到 recipe 为空，分不清「还在加载」和「真的没有」 */
+        val recipe = b.recipes.firstOrNull { it.id == recipeId } ?: return@combine DetailState(loaded = true)
         val c = cupsRaw.coerceAtLeast(1)
-        /* 用一致库存快照计算匹配（§五.10） */
+        /* 用一致库存快照计算匹配（§五.10）。maxCups 与 servings 无关（MatchEngine 内部按单杯需求推导），
+           因此只算一次 match，不再为「1 杯」重复一遍 */
         val engine = MatchEngine(SnapshotStore(b.bottles), catalog.substitutions)
-        val m1 = engine.match(recipe, 1, b.ings)
         val m = engine.match(recipe, c, b.ings)
         val bottlesOf = recipe.ingredients.map { it.ingredientId }.distinct()
             .associateWith { id -> b.bottles.filter { it.ingredientId == id } }
         DetailState(
             recipe = recipe,
             match = m,
-            maxCups = maxOf(1, m1.maxCups),
+            maxCups = maxOf(1, m.maxCups),
             cups = c,
             isFav = b.favs.contains(recipeId),
             overrides = p.overrides,
@@ -105,9 +130,12 @@ class DetailViewModel @Inject constructor(
             bottlesOf = bottlesOf,
             existingDraft = draft?.takeIf { it.recipeId == recipeId },
             createdDraftId = created,
-            starting = starting.value
+            starting = p.starting,
+            error = p.error,
+            loaded = true
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DetailState())
+    }.flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DetailState())
 
     fun setCups(delta: Int, max: Int) { cups.value = (cups.value + delta).coerceIn(1, maxOf(1, max)) }
     fun toggleFav() {
@@ -121,6 +149,26 @@ class DetailViewModel @Inject constructor(
         overrides.value = if (bottleId == null) overrides.value - ingId else overrides.value + (ingId to bottleId)
         sheetFor.value = null
     }
+    /* 替代方案是否已经默认勾选过一轮（防止用户手动全取消后被重新自动勾选） */
+    private var subsAutoPicked = false
+
+    /** 替代方案默认勾选：匹配就绪、且用户尚未确认任何替代时，每种缺料自动选第一条方案
+     * （subs 已经过库存校验、按优先级排序，取 first）；只执行一次，后续手动 toggle 不会被覆盖 */
+    fun autoPickSubsOnce() {
+        if (subsAutoPicked) return
+        val m = state.value.match ?: return
+        val needSubIds = m.subs.map { it.ri.ingredientId }.distinct()
+        if (needSubIds.isEmpty()) return
+        if (chosenSubs.value.isNotEmpty()) { subsAutoPicked = true; return }
+        val picked = needSubIds.mapNotNull { id ->
+            m.subs.firstOrNull { it.ri.ingredientId == id }?.let { id to it.rule.toId }
+        }.toMap()
+        if (picked.isNotEmpty()) {
+            chosenSubs.value = chosenSubs.value + picked
+            subsAutoPicked = true
+        }
+    }
+
     /** 确认某个替代方案（from → to）；再次选择同一方案可取消 */
     fun chooseSub(fromId: String, toId: String) {
         val cur = chosenSubs.value[fromId]
@@ -139,6 +187,8 @@ class DetailViewModel @Inject constructor(
                 st.existingDraft?.let { cabinet.deleteDraft(it.id) }
                 val draft = cabinet.createDraft(recipeId, st.cups, st.overrides, st.chosenSubs)
                 createdDraftId.value = draft.id
+            } catch (e: Exception) {
+                errorMessage.value = e.message ?: "这条草稿没建起来，再试一次"
             } finally {
                 starting.value = false
             }
@@ -146,14 +196,14 @@ class DetailViewModel @Inject constructor(
     }
 
     fun consumeNavigation() { createdDraftId.value = null }
+
+    fun clearError() { errorMessage.value = null }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
-fun RecipeDetailScreen(nav: NavHostController, recipeId: String, vm: DetailViewModel = hiltViewModel()) {
-    val s by vm.state.collectAsState()
-    val recipe = s.recipe ?: return
-    val m = s.match ?: return
+fun RecipeDetailScreen(nav: NavHostController, vm: DetailViewModel = hiltViewModel()) {
+    val s by vm.state.collectAsStateWithLifecycle()
     var confirmResume by remember { mutableStateOf(false) }
 
     LaunchedEffect(s.createdDraftId) {
@@ -163,8 +213,28 @@ fun RecipeDetailScreen(nav: NavHostController, recipeId: String, vm: DetailViewM
         }
     }
 
+    /* 替代方案默认勾选：匹配算出来就自动各选第一条，用户手动改过之后不再覆盖 */
+    LaunchedEffect(s.match) { vm.autoPickSubsOnce() }
+
+    /* 建草稿失败等运行时错误：统一弹窗（返回路径上也能看到，不会只有转圈没有出口） */
+    MessageDialog(s.error, vm::clearError)
+
+    /* 从调酒页退回本页：调酒页把标记写进**本页 entry**（进调酒页的那一个），所以这里读自己的 entry 就能收到 */
+    val snackbarHostState = remember { SnackbarHostState() }
+    val savedEntry = nav.currentBackStackEntry?.savedStateHandle
+    val progressSaved by produceState(false, savedEntry) {
+        savedEntry?.getStateFlow(Routes.MIX_PROGRESS_SAVED, false)?.collect { value = it }
+    }
+    LaunchedEffect(progressSaved) {
+        if (progressSaved) {
+            savedEntry?.set(Routes.MIX_PROGRESS_SAVED, false)
+            snackbarHostState.showSnackbar("进度已保存，随时可以回来接着调")
+        }
+    }
+
     Scaffold(
         containerColor = Bg,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             Row(
                 Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp),
@@ -172,14 +242,22 @@ fun RecipeDetailScreen(nav: NavHostController, recipeId: String, vm: DetailViewM
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = { nav.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", tint = Fg) }
-                Text(recipe.sourceNote, color = Muted, fontSize = 12.sp)
-                IconButton(onClick = { vm.toggleFav() }) {
-                    if (s.isFav) Icon(Icons.Filled.Star, "已收藏", tint = Accent)
-                    else Icon(Icons.Outlined.StarBorder, "收藏", tint = Fg)
+                Text(s.recipe?.sourceNote ?: "", color = Muted, fontSize = 12.sp)
+                /* 收藏：图标弹性缩放反馈（点按从当前值继续，可中断） */
+                var favPulse by remember { mutableStateOf(false) }
+                val favScale by animateFloatAsState(
+                    if (favPulse) 1.25f else 1f, AmberMotion.bounceSpring(), label = "favPulse"
+                ) { favPulse = false }
+                IconButton(onClick = { favPulse = true; vm.toggleFav() }, enabled = s.recipe != null) {
+                    if (s.isFav) Icon(Icons.Filled.Star, "已收藏", tint = Accent, modifier = Modifier.scale(favScale))
+                    else Icon(Icons.Outlined.StarBorder, "收藏", tint = Fg, modifier = Modifier.scale(favScale))
                 }
             }
         },
         bottomBar = {
+            /* 配方已经确定不存在时，底部不挂「开始调酒」按钮（上面给的是「找不到这个配方」） */
+            if (s.loaded && s.recipe == null) return@Scaffold
+            val m = s.match ?: return@Scaffold
             /* 需要替代的每一项都必须有用户明确确认的替代方案 */
             val needSubIds = m.subs.map { it.ri.ingredientId }.distinct()
             val blocked = m.status == RecipeStatus.MISSING || m.status == RecipeStatus.INSUFFICIENT ||
@@ -208,85 +286,130 @@ fun RecipeDetailScreen(nav: NavHostController, recipeId: String, vm: DetailViewM
             }
         }
     ) { padding ->
-        Column(Modifier.padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
-            /* 主视觉 */
-            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                GlassPour(recipe.glass, parseLiquid(recipe.liquid), Modifier.size(150.dp, 172.dp))
-                Text(recipe.zh, fontFamily = FontFamily.Serif, fontSize = 30.sp, color = Fg, modifier = Modifier.padding(top = 16.dp))
-                Text(recipe.en, color = Muted, fontSize = 12.sp)
-                Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    val flavorZh = mapOf("sweet" to "甜", "sour" to "酸", "bitter" to "苦", "fresh" to "清爽", "strong" to "浓烈")
-                    (recipe.flavors.mapNotNull { flavorZh[it] } + recipe.method + recipe.glassZh + ("约 " + Units.fmt(recipe.abv) + "% vol")).forEach {
-                        AssistChip(onClick = {}, label = { Text(it, fontSize = 11.sp) })
+        val recipe = s.recipe
+        val m = s.match
+        /* 还没算过才是加载中；算过却查不到配方 = 它确实不存在（删掉的私人配方 / 旧链接），要有出口而不是一直转圈 */
+        val loading = !s.loaded
+        Crossfade(loading, animationSpec = AmberMotion.med(), label = "detailLoading") { isLoading ->
+            if (isLoading) {
+                Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = Accent)
+                }
+            } else if (recipe == null || m == null) {
+                Column(Modifier.padding(padding).padding(24.dp)) {
+                    Text("找不到这个配方", color = Fg)
+                    Text("它可能已经被删掉了，回酒谱里重新挑一杯吧", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+                    TextButton(onClick = { nav.popBackStack() }, modifier = Modifier.padding(top = 8.dp)) {
+                        Text("返回", color = Accent)
                     }
                 }
-            }
-
-            /* 状态 */
-            Column(Modifier.fillMaxWidth().padding(top = 20.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    StatusBadge(m.status)
-                    Spacer(Modifier.width(12.dp))
-                    Text(statusText(m, s.maxCups), color = Muted, fontSize = 13.sp)
-                }
-                HorizontalDivider(color = Fg.copy(alpha = 0.06f), modifier = Modifier.padding(top = 14.dp))
-            }
-            if (recipe.allergens.isNotEmpty()) {
-                Text("过敏提醒：含" + recipe.allergens.joinToString("、"), color = StMiss, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
-            }
-
-            /* 杯数 */
-            Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Column {
-                    Text("调几杯", fontSize = 15.sp, color = Fg)
-                    Text("材料用量会跟着算好", color = Muted, fontSize = 12.sp)
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedButton(onClick = { vm.setCups(-1, s.maxCups) }, enabled = s.cups > 1) { Text("−") }
-                    MonoNum(s.cups.toString(), Modifier.padding(horizontal = 14.dp), size = 24)
-                    OutlinedButton(onClick = { vm.setCups(1, s.maxCups) }, enabled = s.cups < s.maxCups) { Text("+") }
-                }
-            }
-
-            /* 材料与用量 */
-            SectionHead("材料与用量", s.cups.toString() + " 杯")
-            recipe.ingredients.forEach { ri ->
-                IngredientRow(ri, s, vm)
-                HorizontalDivider(color = Fg.copy(alpha = 0.06f))
-            }
-
-            /* 步骤预览 */
-            SectionHead("步骤预览", recipe.steps.size.toString() + " 步 · 约 " + recipe.timeMin + " 分钟")
-            Column {
-                recipe.steps.forEachIndexed { i, step ->
-                    Row(Modifier.padding(vertical = 8.dp)) {
-                        Text((i + 1).toString(), fontFamily = FontFamily.Monospace, color = Muted, fontSize = 12.sp, modifier = Modifier.width(28.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(step.title, fontSize = 14.sp, color = Fg)
-                            Text(step.detail, fontSize = 13.sp, color = Muted)
+            } else {
+                val r = recipe
+                val match = m
+                Column(Modifier.padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
+                    /* 主视觉（杯型与列表行共享元素，飞入放大） */
+                    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                        val sharedScope = LocalAmberSharedScope.current
+                        val animScope = LocalAmberAnimScope.current
+                        val glassModifier = if (sharedScope != null && animScope != null) {
+                            with(sharedScope) {
+                                Modifier.sharedElement(
+                                    rememberSharedContentState(key = "glass-" + r.id),
+                                    animScope
+                                )
+                            }
+                        } else Modifier
+                        GlassPour(r.glass, r.liquid, glassModifier.size(150.dp, 172.dp))
+                        Text(r.zh, fontFamily = FontFamily.Serif, fontSize = 30.sp, color = Fg, modifier = Modifier.padding(top = 16.dp))
+                        Text(r.en, color = Muted, fontSize = 12.sp)
+                        Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            (r.flavors.map { Flavor.zh(it) } + r.method + r.glassZh + ("约 " + Units.fmt(r.abv) + "% vol")).forEach {
+                                AssistChip(onClick = {}, label = { Text(it, fontSize = 11.sp) })
+                            }
                         }
-                        if (step.timerSeconds > 0) MonoNum(step.timerSeconds.toString() + " 秒", size = 11, color = Muted)
                     }
+
+                    /* 状态 */
+                    Column(Modifier.fillMaxWidth().padding(top = 20.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            StatusBadge(match.status)
+                            Spacer(Modifier.width(12.dp))
+                            Text(statusText(match, s.maxCups), color = Muted, fontSize = 13.sp)
+                        }
+                        HorizontalDivider(color = Fg.copy(alpha = 0.06f), modifier = Modifier.padding(top = 14.dp))
+                    }
+                    if (r.allergens.isNotEmpty()) {
+                        Text("过敏提醒：含" + r.allergens.joinToString("、"), color = StMiss, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
+                    }
+
+                    /* 杯数（数字滚动切换，可中断） */
+                    Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Column {
+                            Text("调几杯", fontSize = 15.sp, color = Fg)
+                            Text("材料用量会跟着算好", color = Muted, fontSize = 12.sp)
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            OutlinedButton(onClick = { vm.setCups(-1, s.maxCups) }, enabled = s.cups > 1) { Text("−") }
+                            AnimatedContent(
+                                targetState = s.cups,
+                                transitionSpec = {
+                                    if (targetState > initialState) {
+                                        (slideInVertically(AmberMotion.fast()) { it / 2 } + fadeIn(AmberMotion.fast()))
+                                            .togetherWith(slideOutVertically(AmberMotion.fast()) { -it / 2 } + fadeOut(AmberMotion.fast()))
+                                    } else {
+                                        (slideInVertically(AmberMotion.fast()) { -it / 2 } + fadeIn(AmberMotion.fast()))
+                                            .togetherWith(slideOutVertically(AmberMotion.fast()) { it / 2 } + fadeOut(AmberMotion.fast()))
+                                    }
+                                },
+                                label = "cups"
+                            ) { cups ->
+                                MonoNum(cups.toString(), Modifier.padding(horizontal = 14.dp), size = 24)
+                            }
+                            OutlinedButton(onClick = { vm.setCups(1, s.maxCups) }, enabled = s.cups < s.maxCups) { Text("+") }
+                        }
+                    }
+
+                    /* 材料与用量 */
+                    SectionHead("材料与用量", s.cups.toString() + " 杯")
+                    r.ingredients.forEach { ri ->
+                        IngredientRow(ri, s, vm)
+                        HorizontalDivider(color = Fg.copy(alpha = 0.06f))
+                    }
+
+                    /* 步骤预览 */
+                    SectionHead("步骤预览", r.steps.size.toString() + " 步 · 约 " + r.timeMin + " 分钟")
+                    Column {
+                        r.steps.forEachIndexed { i, step ->
+                            Row(Modifier.padding(vertical = 8.dp)) {
+                                Text((i + 1).toString(), fontFamily = FontFamily.Monospace, color = Muted, fontSize = 12.sp, modifier = Modifier.width(28.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(step.title, fontSize = 14.sp, color = Fg)
+                                    Text(step.detail, fontSize = 13.sp, color = Muted)
+                                }
+                                if (step.timerSeconds > 0) MonoNum(step.timerSeconds.toString() + " 秒", size = 11, color = Muted)
+                            }
+                        }
+                    }
+
+                    /* 私人配方操作 */
+                    Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        OutlinedButton(onClick = { nav.navigate(Routes.recipeEdit(base = r.id)) }) {
+                            Text("复制一份自己改", fontSize = 13.sp)
+                        }
+                        if (r.isUser) {
+                            OutlinedButton(onClick = { nav.navigate(Routes.recipeEdit(id = r.id)) }) {
+                                Text("编辑此配方", fontSize = 13.sp)
+                            }
+                        }
+                    }
+
+                    Text(
+                        "来源：" + r.sourceNote + " · 中文说明为原创 · 理性饮酒，未成年人禁止饮酒",
+                        color = Muted, fontSize = 11.sp, modifier = Modifier.padding(vertical = 10.dp)
+                    )
+                    Spacer(Modifier.height(24.dp))
                 }
             }
-
-            /* 私人配方操作 */
-            Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedButton(onClick = { nav.navigate(Routes.recipeEdit(base = recipe.id)) }) {
-                    Text("复制一份自己改", fontSize = 13.sp)
-                }
-                if (recipe.isUser) {
-                    OutlinedButton(onClick = { nav.navigate(Routes.recipeEdit(id = recipe.id)) }) {
-                        Text("编辑此配方", fontSize = 13.sp)
-                    }
-                }
-            }
-
-            Text(
-                "来源：" + recipe.sourceNote + " · 中文说明为原创 · 理性饮酒，未成年人禁止饮酒",
-                color = Muted, fontSize = 11.sp, modifier = Modifier.padding(vertical = 10.dp)
-            )
-            Spacer(Modifier.height(24.dp))
         }
     }
 
@@ -297,7 +420,7 @@ fun RecipeDetailScreen(nav: NavHostController, recipeId: String, vm: DetailViewM
             title = { Text("上次还没调完") },
             text = { Text("这杯上次调到一半。接着调，还是从头来？") },
             confirmButton = {
-                TextButton(onClick = { confirmResume = false; vm.startMix(s.existingDraft!!.id) }) { Text("接着调", color = Accent) }
+                TextButton(onClick = { confirmResume = false; vm.startMix(s.existingDraft?.id) }) { Text("接着调", color = Accent) }
             },
             dismissButton = {
                 TextButton(onClick = { confirmResume = false; vm.startMix(null) }) { Text("从头来") }
@@ -327,7 +450,7 @@ fun RecipeDetailScreen(nav: NavHostController, recipeId: String, vm: DetailViewM
 
     /* 替代方案弹层：展示全部可用方案、比例、风味变化与适用限制（§五.5/五.6） */
     s.subSheetFor?.let { ingId ->
-        val choices = m.subs.filter { it.ri.ingredientId == ingId }
+        val choices = s.match?.subs?.filter { it.ri.ingredientId == ingId } ?: emptyList()
         ModalBottomSheet(onDismissRequest = { vm.closeSubSheet() }, containerColor = Raised) {
             Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 26.dp)) {
                 Text("换个材料顶上", style = MaterialTheme.typography.titleLarge)

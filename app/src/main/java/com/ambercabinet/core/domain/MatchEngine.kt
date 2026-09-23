@@ -42,23 +42,23 @@ class MatchEngine(
 ) {
     fun substitutionsAll(): List<SubstitutionRule> = substitutions
 
+    /* 构造时预索引：按 fromId 分组并按优先级排序，避免每次调用全表 filter + sortedBy */
+    private val rulesByFrom: Map<String, List<SubstitutionRule>> =
+        substitutions.groupBy { it.fromId }.mapValues { (_, v) -> v.sortedBy { it.priority } }
+
     /**
      * 单层替代查询（§7.3）：方向性（from→to）+ 适用方法 + 优先级排序。
      * 返回全部适用方案供用户确认，不只取第一条。
      */
     fun subRulesFor(fromId: String, method: String? = null): List<SubstitutionRule> =
-        substitutions
-            .filter { it.fromId == fromId }
+        rulesByFrom[fromId].orEmpty()
             .filter { method == null || it.methods == "全部方法" || it.methods.split('、', ',', ' ').contains(method) }
-            .sortedBy { it.priority }
-
-    /** 兼容旧调用：最高优先级方案 */
-    fun subRule(fromId: String): SubstitutionRule? = subRulesFor(fromId).firstOrNull()
 
     private data class Avail(val total: Double, val unit: String?, val bottles: List<Bottle>)
 
     private suspend fun available(ingredientId: String): Avail {
-        val bs = store.bottlesFor(ingredientId).filter { !it.deleted }
+        /* InventoryStore 契约：实现方保证返回的瓶不含已删除（SnapshotStore 构造时过滤；Room 查询带 deleted = 0） */
+        val bs = store.bottlesFor(ingredientId)
         if (bs.isEmpty()) return Avail(0.0, null, emptyList())
         val unit = bs[0].unit
         /* 同种材料多瓶统一到标准单位后汇总（§五.9）；单位不一致的瓶不混入 */
