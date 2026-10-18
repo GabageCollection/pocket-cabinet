@@ -1288,6 +1288,111 @@
       "label": "丁香",
       "abv": 0,
       "cap": 30
+    },
+    {
+      "ingredient": "vodka",
+      "brand": "雪树 Belvedere",
+      "label": "原味",
+      "abv": 40,
+      "cap": 700
+    },
+    {
+      "ingredient": "vodka",
+      "brand": "坎特一号 Ketel One",
+      "label": "原味",
+      "abv": 40,
+      "cap": 750
+    },
+    {
+      "ingredient": "gin",
+      "brand": "海曼 Hayman's",
+      "label": "London Dry",
+      "abv": 41.2,
+      "cap": 700
+    },
+    {
+      "ingredient": "gin",
+      "brand": "猴王47 Monkey 47",
+      "label": "黑森林干金",
+      "abv": 47,
+      "cap": 500
+    },
+    {
+      "ingredient": "tequila",
+      "brand": "奥美加 Olmeca",
+      "label": "银标",
+      "abv": 38,
+      "cap": 750
+    },
+    {
+      "ingredient": "bourbon",
+      "brand": "四玫瑰 Four Roses",
+      "label": "黄标",
+      "abv": 40,
+      "cap": 700
+    },
+    {
+      "ingredient": "bourbon",
+      "brand": "伍德福德珍藏 Woodford Reserve",
+      "label": "波本",
+      "abv": 43.2,
+      "cap": 750
+    },
+    {
+      "ingredient": "white_rum",
+      "brand": "蔗园 Plantation",
+      "label": "3 Stars 白朗姆",
+      "abv": 41.2,
+      "cap": 700
+    },
+    {
+      "ingredient": "cognac",
+      "brand": "馥华诗 Courvoisier",
+      "label": "V.S",
+      "abv": 40,
+      "cap": 700
+    },
+    {
+      "ingredient": "orange_liqueur",
+      "brand": "波士 Bols",
+      "label": "Triple Sec",
+      "abv": 38,
+      "cap": 700
+    },
+    {
+      "ingredient": "sweet_vermouth",
+      "brand": "杜凌 Dolin",
+      "label": "红 Rouge",
+      "abv": 16,
+      "cap": 750
+    },
+    {
+      "ingredient": "dry_vermouth",
+      "brand": "杜凌 Dolin",
+      "label": "干 Dry",
+      "abv": 17.5,
+      "cap": 750
+    },
+    {
+      "ingredient": "dry_vermouth",
+      "brand": "仙山露 Cinzano",
+      "label": "干 Extra Dry",
+      "abv": 15,
+      "cap": 1000
+    },
+    {
+      "ingredient": "tonic",
+      "brand": "怡泉 Schweppes",
+      "label": "汤力水",
+      "abv": 0,
+      "cap": 330
+    },
+    {
+      "ingredient": "tonic",
+      "brand": "芬味树 Fever-Tree",
+      "label": "印度汤力",
+      "abv": 0,
+      "cap": 500
     }
   ]
 }

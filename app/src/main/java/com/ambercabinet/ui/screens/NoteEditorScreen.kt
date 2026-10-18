@@ -122,7 +122,9 @@ class NoteViewModel @Inject constructor(
                         sour = s.sour.takeIf { it > 0 },
                         bitter = s.bitter.takeIf { it > 0 },
                         body = s.body.takeIf { it > 0 },
-                        text = s.text.trim()
+                        text = s.text.trim(),
+                        photoUri = records.noteForSession(sessionId)?.photoUri,
+                        createdAt = records.noteForSession(sessionId)?.createdAt ?: System.currentTimeMillis()
                     )
                 )
                 _state.update { it.copy(saving = false, saved = true) }

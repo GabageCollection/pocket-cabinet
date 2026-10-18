@@ -35,6 +35,7 @@ import com.ambercabinet.ui.components.*
 import com.ambercabinet.ui.nav.Routes
 import com.ambercabinet.ui.theme.*
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -112,13 +113,20 @@ class RecordsViewModel @Inject constructor(
         if (undoing.value) return
         undoing.value = true
         viewModelScope.launch {
-            val result = cabinet.undoSessionAtomic(inventory, sessionId)
-            msg.value = when (result) {
-                is UndoResult.Done -> "已撤销：用掉的材料已经加回库存，这条记录会保留"
-                is UndoResult.AlreadyUndone -> "这次已经撤销过了，不能重复撤销"
-                is UndoResult.NotFound -> "找不到对应的扣减记录，可能已经被删掉了"
+            try {
+                val result = cabinet.undoSessionAtomic(inventory, sessionId)
+                msg.value = when (result) {
+                    is UndoResult.Done -> "已撤销：用掉的材料已经加回库存，这条记录会保留"
+                    is UndoResult.AlreadyUndone -> "这次已经撤销过了，不能重复撤销"
+                    is UndoResult.NotFound -> "找不到对应的扣减记录，可能已经被删掉了"
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                msg.value = e.message ?: "撤销失败，请重试"
+            } finally {
+                undoing.value = false
             }
-            undoing.value = false
         }
     }
 

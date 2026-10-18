@@ -1,5 +1,8 @@
 package com.ambercabinet.ui.screens
 
+import androidx.activity.compose.BackHandler
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import android.app.Activity
 import android.view.WindowManager
 import androidx.compose.animation.AnimatedContent
@@ -57,6 +60,7 @@ data class MixState(
     val timerLeft: Int = 0,
     val timerTotal: Int = 0,
     val timerRunning: Boolean = false,
+    val timerFinished: Boolean = false,
     val finishOpen: Boolean = false,
     val actual: Int = 1,
     val plan: PourPlan? = null,
@@ -148,7 +152,7 @@ class MixViewModel @Inject constructor(
                     val left = ceil((d.timerEndAt - System.currentTimeMillis()) / 1000.0).toInt().coerceAtLeast(0)
                     _state.update { it.copy(timerLeft = left) }
                     if (left <= 0) {
-                        _state.update { it.copy(timerRunning = false) }
+                        _state.update { it.copy(timerRunning = false, timerFinished = true) }
                         persistTimer(running = false, remaining = 0, endAt = null)
                     }
                 }
@@ -156,30 +160,58 @@ class MixViewModel @Inject constructor(
         }
     }
 
-    private fun persistTimer(running: Boolean, remaining: Int, endAt: Long?) {
-        val d = _state.value.draft ?: return
-        viewModelScope.launch {
-            cabinet.saveDraft(d.copy(timerRunning = running, timerRemainingSec = remaining, timerEndAt = endAt, timerStep = d.currentStep))
-            _state.update { it.copy(draft = it.draft?.copy(timerRunning = running, timerRemainingSec = remaining, timerEndAt = endAt, timerStep = d.currentStep)) }
+    private var pendingWrite: Job? = null
+    private var exiting = false
+    private fun locked() = exiting || _state.value.submitting || _state.value.undoing || _state.value.doneSession != null
+
+    private fun enqueueWrite(block: suspend () -> Unit) {
+        val previous = pendingWrite
+        pendingWrite = viewModelScope.launch {
+            previous?.join()
+            block()
         }
     }
 
+    private fun saveDraft(draft: MixDraft) {
+        enqueueWrite {
+            try {
+                cabinet.saveDraft(draft)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update { it.copy(error = "进度没存上，再试一次") }
+            }
+        }
+    }
+
+    private fun persistTimer(running: Boolean, remaining: Int, endAt: Long?) {
+        if (locked()) return
+        val d = _state.value.draft ?: return
+        val next = d.copy(timerRunning = running, timerRemainingSec = remaining, timerEndAt = endAt, timerStep = d.currentStep)
+        _state.update { it.copy(draft = next) }
+        saveDraft(next)
+    }
+
     fun setStep(step: Int) {
+        if (locked()) return
         val r = _state.value.recipe ?: return
         val d = _state.value.draft ?: return
+        if (r.steps.isEmpty()) return
         val s = step.coerceIn(0, r.steps.size - 1)
         val total = r.steps[s].timerSeconds
         val nd = d.copy(currentStep = s, timerRunning = false, timerRemainingSec = total, timerEndAt = null, timerStep = s)
-        _state.update { it.copy(draft = nd, timerTotal = total, timerLeft = total, timerRunning = false) }
-        viewModelScope.launch { cabinet.saveDraft(nd) }   /* 切换步骤即保存（§14） */
+        _state.update { it.copy(draft = nd, timerTotal = total, timerLeft = total, timerRunning = false, timerFinished = false) }
+        saveDraft(nd)
     }
 
     fun toggleTimer() {
+        if (locked()) return
         val st = _state.value
         if (st.timerTotal <= 0) return
         if (st.timerRunning) {
-            persistTimer(running = false, remaining = st.timerLeft, endAt = null)
-            _state.update { it.copy(timerRunning = false) }
+            val remaining = st.draft?.timerEndAt?.let { ceil((it - System.currentTimeMillis()) / 1000.0).toInt().coerceAtLeast(0) } ?: st.timerLeft
+            persistTimer(running = false, remaining = remaining, endAt = null)
+            _state.update { it.copy(timerRunning = false, timerLeft = remaining) }
         } else {
             val remaining = if (st.timerLeft <= 0) st.timerTotal else st.timerLeft
             val endAt = System.currentTimeMillis() + remaining * 1000L
@@ -189,98 +221,114 @@ class MixViewModel @Inject constructor(
     }
 
     fun resetTimer() {
+        if (locked()) return
         val total = _state.value.timerTotal
         persistTimer(running = false, remaining = total, endAt = null)
         _state.update { it.copy(timerLeft = total, timerRunning = false) }
     }
 
-    /** 退出：草稿全程已持久化，这里做最终保存；成功后界面才能提示「进度已保存」 */
     fun exitAndSave() {
-        viewModelScope.launch {
-            val d = _state.value.draft
-            if (d != null) {
-                try {
-                    cabinet.saveDraft(d)
-                    _state.update { it.copy(exitSaved = true) }
-                } catch (e: Exception) {
-                    _state.update { it.copy(error = "进度没存上，再试一次") }
-                }
-            } else {
+        if (exiting || _state.value.submitting || _state.value.undoing || _state.value.loading) return
+        exiting = true
+        _state.update { it.copy(submitting = true) }
+        val d = _state.value.draft
+        enqueueWrite {
+            try {
+                if (d != null && _state.value.doneSession == null) cabinet.saveDraft(d)
                 _state.update { it.copy(exitSaved = true) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update { it.copy(error = "进度没存上，再试一次") }
+            } finally {
+                exiting = false
+                _state.update { it.copy(submitting = false) }
             }
         }
     }
 
     fun openFinish() {
+        if (locked()) return
         _state.update { it.copy(finishOpen = true, actual = it.draft?.servings ?: 1, planChangedNotice = false) }
         refreshPlan()
     }
-    fun closeFinish() { _state.update { it.copy(finishOpen = false) } }
+    fun closeFinish() {
+        if (_state.value.submitting || _state.value.undoing) return
+        _state.update { it.copy(finishOpen = false) }
+    }
 
     fun setActual(delta: Int) {
-        _state.update { it.copy(actual = (it.actual + delta).coerceAtLeast(1), planChangedNotice = false) }
+        if (locked()) return
+        _state.update { it.copy(actual = (it.actual + delta).coerceIn(1, 100), planChangedNotice = false) }
         refreshPlan()
     }
 
-    /* 完成时按草稿中已确认的选瓶与替代重新检查库存（§6.3 / §14） */
+    private var planJob: Job? = null
     private fun refreshPlan() {
-        viewModelScope.launch {
-            val st = _state.value
-            val r = st.recipe ?: return@launch
-            val d = st.draft ?: return@launch
-            val plan = inventory.planPour(
-                r, st.actual, st.ingredients,
-                overrides = d.bottleOverrides, chosenSubs = d.chosenSubs
-            )
-            _state.update { it.copy(plan = plan) }
+        planJob?.cancel()
+        val st = _state.value
+        _state.update { it.copy(plan = null) }
+        planJob = viewModelScope.launch {
+            try {
+                val r = st.recipe ?: return@launch
+                val d = st.draft ?: return@launch
+                val plan = inventory.planPour(r, st.actual, st.ingredients, overrides = d.bottleOverrides, chosenSubs = d.chosenSubs)
+                _state.update { it.copy(plan = plan) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update { it.copy(error = e.message ?: "用量计算失败，请重试") }
+            }
         }
     }
 
-    /** 确认扣减：幂等（submitting + 同一 sessionId 只能成功一次）；计划变化须重新确认 */
     fun confirm() {
+        if (locked()) return
         val st = _state.value
-        if (st.submitting) return
         val r = st.recipe ?: return
         val d = st.draft ?: return
         val plan = st.plan ?: return
         if (!plan.ok) return
         _state.update { it.copy(submitting = true, error = null) }
-        viewModelScope.launch {
-            val result = try {
-                cabinet.commitMixAtomic(inventory, d, r, st.actual, st.ingredients, plan.fingerprint(st.actual))
+        enqueueWrite {
+            try {
+                when (val result = cabinet.commitMixAtomic(inventory, d, r, st.actual, st.ingredients, plan.fingerprint(st.actual))) {
+                    is CommitResult.Success -> _state.update { it.copy(doneSession = result.session, donePlan = result.plan, timerRunning = false) }
+                    is CommitResult.AlreadyCommitted -> _state.update { it.copy(doneSession = result.session, timerRunning = false) }
+                    is CommitResult.PlanChanged -> _state.update { it.copy(plan = result.freshPlan, planChangedNotice = true) }
+                    is CommitResult.Failed -> _state.update { it.copy(error = result.problems.joinToString("；").ifBlank { "材料不够，库存扣不了" }) }
+                }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
-                CommitResult.Failed(listOf(e.message ?: "保存失败"))
-            }
-            when (result) {
-                is CommitResult.Success -> _state.update {
-                    it.copy(submitting = false, doneSession = result.session, donePlan = result.plan)
-                }
-                is CommitResult.AlreadyCommitted -> _state.update {
-                    it.copy(submitting = false, doneSession = result.session)
-                }
-                is CommitResult.PlanChanged -> _state.update {
-                    it.copy(submitting = false, plan = result.freshPlan, planChangedNotice = true)
-                }
-                is CommitResult.Failed -> _state.update {
-                    it.copy(submitting = false, error = result.problems.joinToString("；").ifBlank { "材料不够，库存扣不了" })
-                }
+                _state.update { it.copy(error = e.message ?: "保存失败") }
+            } finally {
+                _state.update { it.copy(submitting = false) }
             }
         }
     }
 
     fun undo() {
         val id = _state.value.doneSession?.id ?: return
-        if (_state.value.undoing) return
+        if (_state.value.undoing || _state.value.submitting || _state.value.undone) return
         _state.update { it.copy(undoing = true) }
         viewModelScope.launch {
-            when (cabinet.undoSessionAtomic(inventory, id)) {
-                is UndoResult.Done -> _state.update { it.copy(undoing = false, undone = true) }
-                is UndoResult.AlreadyUndone -> _state.update { it.copy(undoing = false, undone = true) }
-                else -> _state.update { it.copy(undoing = false, error = "这次没能撤销，可能这条记录已经撤销过了") }
+            try {
+                when (cabinet.undoSessionAtomic(inventory, id)) {
+                    is UndoResult.Done, is UndoResult.AlreadyUndone -> _state.update { it.copy(undone = true) }
+                    else -> _state.update { it.copy(error = "这次没能撤销，可能这条记录已经撤销过了") }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update { it.copy(error = e.message ?: "撤销失败，请重试") }
+            } finally {
+                _state.update { it.copy(undoing = false) }
             }
         }
     }
 
+    fun clearTimerFinished() { _state.update { it.copy(timerFinished = false) } }
     fun clearError() { _state.update { it.copy(error = null) } }
 }
 
@@ -297,6 +345,7 @@ fun MixSessionScreen(nav: NavHostController, vm: MixViewModel = hiltViewModel())
             nav.popBackStack()
         }
     }
+    BackHandler(enabled = !s.loading && !s.exitSaved && !s.submitting && !s.undoing) { vm.exitAndSave() }
 
     /* 屏幕常亮（§6.3），离开页面时清除 */
     val activity = LocalContext.current as? Activity
@@ -408,7 +457,7 @@ private fun MixSessionBody(nav: NavHostController, vm: MixViewModel, s: MixState
                     colors = CardDefaults.cardColors(containerColor = if (s.timerRunning) Raised else Surface)
                 ) {
                     Column(Modifier.padding(20.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(step.timerLabel ?: "建议 " + s.timerTotal + " 秒", color = Muted, fontSize = 12.sp)
+                        Text(if (s.timerFinished) "时间到，可以继续下一步" else step.timerLabel ?: "建议 " + s.timerTotal + " 秒", color = if (s.timerFinished) Accent else Muted, fontSize = 12.sp)
                         MonoNum(
                             (s.timerLeft / 60).toString() + ":" + (s.timerLeft % 60).toString().padStart(2, '0'),
                             Modifier.padding(vertical = 16.dp), size = 46,

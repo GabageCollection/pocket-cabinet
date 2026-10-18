@@ -23,8 +23,8 @@ android {
         applicationId = "com.ambercabinet"
         minSdk = 26
         targetSdk = 34
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.2.0"
         /* 无 androidTest 源集（界面测试未编写），不配置 testInstrumentationRunner */
         vectorDrawables { useSupportLibrary = true }
     }

@@ -41,7 +41,8 @@ data class BottleDetailState(
     val txns: List<InventoryTransaction> = emptyList(),
     val msg: String? = null,
     val archived: Boolean = false,
-    val busy: Boolean = false
+    val busy: Boolean = false,
+    val infoSaved: Boolean = false
 )
 
 @HiltViewModel
@@ -54,6 +55,7 @@ class BottleDetailViewModel @Inject constructor(
     private val msg = MutableStateFlow<String?>(null)
     private val archived = MutableStateFlow(false)
     private val busy = MutableStateFlow(false)
+    private val infoSaved = MutableStateFlow(false)
 
     private val core = combine(cabinet.bottles, cabinet.transactions, catalog.allIngredients) { bottles, txns, ings ->
         val b = bottles.firstOrNull { it.id == bottleId } ?: cabinet.getBottle(bottleId)
@@ -65,8 +67,8 @@ class BottleDetailViewModel @Inject constructor(
         )
     }.flowOn(Dispatchers.Default)
 
-    val state: StateFlow<BottleDetailState> = combine(core, msg, archived, busy) { s, m, a, bz ->
-        s.copy(msg = m, archived = a, busy = bz)
+    val state: StateFlow<BottleDetailState> = combine(core, msg, archived, busy, infoSaved) { s, m, a, bz, saved ->
+        s.copy(msg = m, archived = a, busy = bz, infoSaved = saved)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), BottleDetailState())
 
     private suspend fun <T> guard(block: suspend () -> T): T? {
@@ -100,10 +102,18 @@ class BottleDetailViewModel @Inject constructor(
 
     fun updateInfo(brand: String, label: String, initQty: Double, abv: Double, lowPct: Int, openedAt: Long?) {
         viewModelScope.launch {
-            guard {
-                val b = state.value.bottle ?: return@guard
+            if (busy.value) return@launch
+            busy.value = true
+            infoSaved.value = false
+            try {
+                val b = state.value.bottle ?: return@launch
                 cabinet.updateBottle(b.copy(brand = brand, label = label, initQty = initQty, abv = abv, lowPct = lowPct, openedAt = openedAt))
                 msg.value = "资料改好了"
+                infoSaved.value = true
+            } catch (e: Exception) {
+                msg.value = e.message ?: "保存失败，请检查后重试"
+            } finally {
+                busy.value = false
             }
         }
     }
@@ -132,6 +142,7 @@ fun BottleDetailScreen(nav: NavHostController, vm: BottleDetailViewModel = hiltV
     var showAllTxns by remember { mutableStateOf(false) }
 
     LaunchedEffect(s.archived) { if (s.archived) nav.popBackStack() }
+    LaunchedEffect(s.infoSaved) { if (s.infoSaved) editMode = false }
 
     Scaffold(
         containerColor = Bg,
@@ -269,19 +280,24 @@ fun BottleDetailScreen(nav: NavHostController, vm: BottleDetailViewModel = hiltV
                     ) { DatePicker(state = dpState) }
                 }
                 val iq = initQty.toDoubleOrNull()
-                val abvV = abv.toDoubleOrNull() ?: 0.0
+                val abvV = abv.toDoubleOrNull()
                 val lp = lowPct.toIntOrNull()
+                val capacityError = iq == null || iq <= 0.0 || !iq.isFinite()
+                val abvError = abv.isNotBlank() && (abvV == null || !abvV.isFinite() || abvV !in 0.0..100.0)
+                val lowError = lp == null || lp !in 0..100
+                if (capacityError) Text("容量需填写一个大于 0 的有限数字", color = StMiss, fontSize = 12.sp)
+                if (abvError) Text("酒精度需填写 0 到 100 之间的数", color = StMiss, fontSize = 12.sp)
+                if (lowError) Text("提醒线需填写 0 到 100 的整数", color = StMiss, fontSize = 12.sp)
                 Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     OutlinedButton(onClick = { editMode = false }, modifier = Modifier.weight(1f)) { Text("取消") }
                     Button(
                         onClick = {
-                            vm.updateInfo(brand.trim(), label.trim(), Qty.round(iq!!), abvV, lp!!, if (opened) openedDate ?: System.currentTimeMillis() else null)
-                            editMode = false
+                            vm.updateInfo(brand.trim(), label.trim(), Qty.round(iq!!), abvV ?: 0.0, lp!!, if (opened) openedDate ?: System.currentTimeMillis() else null)
                         },
-                        enabled = brand.isNotBlank() && iq != null && iq > 0 && lp != null && lp in 0..100 && !s.busy,
+                        enabled = brand.isNotBlank() && !capacityError && !abvError && !lowError && !s.busy,
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = AccentInk)
-                    ) { Text("保存") }
+                    ) { Text(if (s.busy) "保存中…" else "保存") }
                 }
             }
             }

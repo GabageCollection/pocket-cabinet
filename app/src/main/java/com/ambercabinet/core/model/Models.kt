@@ -11,6 +11,20 @@ enum class IngredientRole { REQUIRED, OPTIONAL, GARNISH }
 /** 配方状态（规格 §7.1，四色） */
 enum class RecipeStatus { OK, SUBSTITUTABLE, MISSING, INSUFFICIENT }
 
+/** 录入酒瓶时的开瓶状态：未开瓶 / 今天开瓶 / 换成其他日期（入库统一落成 openedAt） */
+enum class OpenedState { UNOPENED, TODAY, CUSTOM }
+
+/**
+ * 开瓶状态 → 酒瓶的 openedAt。
+ * 未开瓶为 null；今天开瓶用当前时间；其他日期用用户所选那天；CUSTOM 漏传日期时按未开瓶处理，
+ * 免得把「没选日期」写成开瓶时间。
+ */
+fun OpenedState.toOpenedAt(date: Long? = null, now: Long = System.currentTimeMillis()): Long? = when (this) {
+    OpenedState.UNOPENED -> null
+    OpenedState.TODAY -> now
+    OpenedState.CUSTOM -> date
+}
+
 data class Ingredient(
     val id: String,
     val zh: String,

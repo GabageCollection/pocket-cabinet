@@ -1,5 +1,6 @@
 package com.ambercabinet.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -17,6 +18,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.NavHostController
+import com.ambercabinet.core.data.prefs.UserPrefs
 import com.ambercabinet.core.data.repo.CabinetRepository
 import com.ambercabinet.core.data.repo.CatalogRepository
 import com.ambercabinet.core.domain.MatchEngine
@@ -26,12 +28,14 @@ import com.ambercabinet.core.units.Qty
 import com.ambercabinet.core.units.Units
 import com.ambercabinet.ui.components.AmberTopBar
 import com.ambercabinet.ui.components.MessageDialog
+import com.ambercabinet.ui.components.rememberDateFmt
 import com.ambercabinet.ui.theme.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.Date
 import java.util.UUID
 import javax.inject.Inject
 
@@ -39,14 +43,29 @@ import javax.inject.Inject
 private val SHAPE_BY_CATEGORY = mapOf("base" to "spirit", "liqueur" to "liqueur", "mix" to "liqueur", "bitters" to "liqueur", "fresh" to "spirit")
 private val LIQUID_BY_CATEGORY = mapOf("base" to "oklch(0.75 0.10 75)", "liqueur" to "oklch(0.62 0.13 55)", "mix" to "oklch(0.85 0.06 90)", "bitters" to "oklch(0.45 0.10 45)", "fresh" to "oklch(0.78 0.12 120)")
 private val CATEGORY_ZH = mapOf("base" to "基酒", "liqueur" to "利口酒", "mix" to "辅料", "bitters" to "苦精", "fresh" to "鲜果")
+private val CATEGORY_ORDER = listOf("base", "liqueur", "mix", "bitters", "fresh")
 
-/* 「常见酒一键添加」：只列内置材料里真实存在的 id（君度类并入橙味利口酒，白砂糖以方糖代替） */
+/* 「常见材料快速添加」：只列内置材料里真实存在的 id（君度类并入橙味利口酒，白砂糖以方糖代替） */
 private val POPULAR_IDS = listOf(
     "gin", "vodka", "white_rum", "tequila", "bourbon", "cognac",
     "orange_liqueur", "sweet_vermouth", "dry_vermouth", "campari", "coffee_liqueur",
     "grenadine", "simple_syrup", "lime", "lemon", "soda", "tonic", "cola",
     "aromatic_bitters", "mint"
 )
+
+/* 向导里只显示基础品类名：材料表的 zh 有些带子类/修饰（gin = 伦敦干金酒、simple_syrup = 原味糖浆），
+   列表和确认页统一用基础名；材料表本身不动，搜索/配方里仍用精确名 */
+private val POPULAR_BASIC_NAME = mapOf(
+    "gin" to "金酒",
+    "white_rum" to "白朗姆",
+    "tequila" to "龙舌兰",
+    "cognac" to "干邑",
+    "simple_syrup" to "糖浆",
+    "lemon" to "柠檬",
+    "mint" to "薄荷"
+)
+
+private fun Ingredient.basicName(): String = POPULAR_BASIC_NAME[id] ?: zh
 
 data class AddBottleState(
     val mode: String = "entry",          // entry / search / manual / confirm
@@ -55,7 +74,8 @@ data class AddBottleState(
     val selected: Pair<Ingredient, Brand?>? = null,
     val capacity: String = "750",
     val remaining: String = "750",
-    val openedToday: Boolean = true,
+    val openedState: OpenedState = OpenedState.TODAY,
+    val openedDate: Long? = null,
     val duplicates: List<Bottle> = emptyList(),
     val dupMode: String = "new",         // new / merge
     val mergeTargetId: String? = null,
@@ -69,18 +89,34 @@ data class AddBottleState(
     val unlockedGain: Int = 0,
     val submitting: Boolean = false,
     val error: String? = null,
-    /* 常见酒一键添加 */
+    /* 常见材料快速添加（分步向导）：用过一次后入口永久消失 */
+    val showQuickAdd: Boolean = true,
     val popular: List<Pair<Ingredient, Brand?>> = emptyList(),
+    val popularCats: List<String> = emptyList(),
     val ownedIngredientIds: Set<String> = emptySet(),
-    val quickAddedMsg: String? = null
+    val quickAddedMsg: String? = null,
+    /* 向导进度：cat 选类型 / ing 选材料 / brand 选品牌 / confirm 确认 */
+    val wizStep: String = "cat",
+    val wizCat: String? = null,
+    val wizIng: Ingredient? = null,
+    val wizBrands: List<Brand?> = emptyList(),
+    val wizBrand: Brand? = null,
+    val wizBrandPicked: Boolean = false,
+    /* 确认步可编辑参数：进入确认页时按品牌/材料默认值预填，入库前都能改 */
+    val wizCapacity: String = "",
+    val wizRemaining: String = "",
+    val wizAbv: String = "",
+    val wizOpenedState: OpenedState = OpenedState.UNOPENED,
+    val wizOpenedDate: Long? = null
 )
 
 @HiltViewModel
 class AddBottleViewModel @Inject constructor(
     private val cabinet: CabinetRepository,
-    private val catalog: CatalogRepository
+    private val catalog: CatalogRepository,
+    private val userPrefs: UserPrefs
 ) : ViewModel() {
-    private val _state = MutableStateFlow(AddBottleState())
+    private val _state = MutableStateFlow(AddBottleState(showQuickAdd = !userPrefs.quickAddUsed))
     val state: StateFlow<AddBottleState> = _state.asStateFlow()
 
     fun setMode(m: String) { _state.update { it.copy(mode = m, error = null) } }
@@ -95,12 +131,15 @@ class AddBottleViewModel @Inject constructor(
        避免长期缓存导致保存后的「又能多调 N 款」失真；也不在 save() 里重复 JSON 解码 */
     @Volatile
     private var recipesCache: List<Recipe> = emptyList()
+    /* 常见酒向导选品牌用：材料 id → 品牌列表（与 searchIndex 同源，Main 线程写、向导读取） */
+    @Volatile
+    private var brandsByIng: Map<String, List<Brand>> = emptyMap()
 
     init {
         viewModelScope.launch {
             catalog.allIngredients.collect { ings ->
                 catalogCache = ings
-                val brandsByIng = catalog.brands.groupBy { it.ingredientId }
+                brandsByIng = catalog.brands.groupBy { it.ingredientId }
                 searchIndex = ings.values.filter { !it.staple }.flatMap { ing ->
                     val base = ing.zh + " " + ing.en + " " + ing.aliases.joinToString(" ")
                     val brands = brandsByIng[ing.id].orEmpty()
@@ -111,7 +150,14 @@ class AddBottleViewModel @Inject constructor(
                 val popular = POPULAR_IDS.mapNotNull { id ->
                     ings[id]?.let { ing -> ing to brandsByIng[id]?.firstOrNull() }
                 }
-                _state.update { it.copy(popular = popular) }
+                /* 向导第一步的分类选项：按 CATEGORY_ORDER 顺序取常见酒里真实存在的分类 */
+                val present = popular.map { it.first.category }.toSet()
+                val popularCats = CATEGORY_ORDER.filter { it in present }
+                _state.update { current ->
+                    val query = current.query.trim().lowercase()
+                    val results = if (query.isEmpty()) searchIndex else searchIndex.filter { it.third.contains(query) }
+                    current.copy(popular = popular, popularCats = popularCats, searchResults = results.take(30).map { it.first to it.second })
+                }
             }
         }
         viewModelScope.launch { cabinet.allRecipes.collect { recipesCache = it } }
@@ -135,7 +181,8 @@ class AddBottleViewModel @Inject constructor(
                     selected = ing to brand,
                     capacity = cap.toString(),
                     remaining = cap.toString(),
-                    mode = "confirm", duplicates = dups, dupMode = "new", mergeTargetId = null
+                    mode = "confirm", duplicates = dups, dupMode = "new", mergeTargetId = null,
+                    openedState = OpenedState.TODAY, openedDate = null
                 )
             }
         }
@@ -171,7 +218,12 @@ class AddBottleViewModel @Inject constructor(
 
     fun setCapacity(v: String) { _state.update { it.copy(capacity = v) } }
     fun setRemaining(v: String) { _state.update { it.copy(remaining = v) } }
-    fun setOpened(o: Boolean) { _state.update { it.copy(openedToday = o) } }
+    /* 未开瓶/今天开瓶都不带日期；选「其他日期」沿用上次选过的日期，没选过就先按今天兜底 */
+    fun setOpenedState(s: OpenedState) {
+        _state.update { it.copy(openedState = s, openedDate = if (s == OpenedState.CUSTOM) (it.openedDate ?: System.currentTimeMillis()) else null) }
+    }
+
+    fun setOpenedDate(d: Long) { _state.update { it.copy(openedState = OpenedState.CUSTOM, openedDate = d) } }
     fun setDupMode(m: String) { _state.update { it.copy(dupMode = m) } }
     fun setMergeTarget(id: String) { _state.update { it.copy(mergeTargetId = id, dupMode = "merge") } }
 
@@ -221,7 +273,7 @@ class AddBottleViewModel @Inject constructor(
                             remaining = Qty.round(rem),
                             unit = ing.unit,
                             abv = brand?.abv ?: ing.defaultAbv,
-                            openedAt = if (ing.dimension == UnitDimension.VOLUME && ing.defaultAbv > 0 && st.openedToday) System.currentTimeMillis() else null
+                            openedAt = if (ing.dimension == UnitDimension.VOLUME && ing.defaultAbv > 0) st.openedState.toOpenedAt(st.openedDate) else null
                         ),
                         reason = "手动新增"
                     )
@@ -237,31 +289,121 @@ class AddBottleViewModel @Inject constructor(
 
     fun clearError() { _state.update { it.copy(error = null) } }
 
-    /* 常见酒一键添加：满瓶入库，字段默认值与 save() 新建路径一致；同材料不去重，直接再建一瓶 */
-    fun quickAdd(ing: Ingredient, brand: Brand?) {
+    /* 常见材料分步向导：类型 → 材料 → 品牌 → 确认；添加成功后回到第一步，可继续添加 */
+    fun startWizard() {
+        _state.update { it.copy(mode = "wizard", wizStep = "cat", wizCat = null, wizIng = null, wizBrands = emptyList(), wizBrand = null, wizBrandPicked = false, error = null) }
+    }
+
+    fun wizPickCat(cat: String) {
+        _state.update { it.copy(wizStep = "ing", wizCat = cat, wizIng = null, wizBrands = emptyList(), wizBrand = null, wizBrandPicked = false) }
+    }
+
+    /* 进入确认页时的默认值：品牌有容量/酒精度就用品牌的，否则按材料默认；默认满瓶、未开瓶 */
+    private fun wizConfirmDefaults(ing: Ingredient, brand: Brand?): Triple<String, String, String> {
+        val cap = (brand?.capacityMl ?: if (ing.dimension == UnitDimension.COUNT) 6 else 750).toString()
+        val abv = (brand?.abv ?: ing.defaultAbv)
+        return Triple(cap, cap, if (abv == abv.toLong().toDouble()) abv.toLong().toString() else abv.toString())
+    }
+
+    fun wizPickIng(ing: Ingredient) {
+        val brands = brandsByIng[ing.id].orEmpty()
+        _state.update {
+            if (brands.isEmpty()) {
+                /* 品牌表里没有这个材料的品牌：跳过选品牌，直接以「未指定品牌」进确认 */
+                val (cap, rem, abv) = wizConfirmDefaults(ing, null)
+                it.copy(
+                    wizStep = "confirm", wizIng = ing, wizBrands = listOf(null), wizBrand = null, wizBrandPicked = true,
+                    wizCapacity = cap, wizRemaining = rem, wizAbv = abv, wizOpenedState = OpenedState.UNOPENED, wizOpenedDate = null
+                )
+            } else {
+                it.copy(wizStep = "brand", wizIng = ing, wizBrands = listOf<Brand?>(null) + brands, wizBrand = null, wizBrandPicked = false)
+            }
+        }
+    }
+
+    fun wizPickBrand(brand: Brand?) {
+        val ing = _state.value.wizIng ?: return
+        val (cap, rem, abv) = wizConfirmDefaults(ing, brand)
+        _state.update {
+            it.copy(
+                wizStep = "confirm", wizBrand = brand, wizBrandPicked = true,
+                wizCapacity = cap, wizRemaining = rem, wizAbv = abv, wizOpenedState = OpenedState.UNOPENED, wizOpenedDate = null
+            )
+        }
+    }
+
+    fun setWizCapacity(v: String) { _state.update { it.copy(wizCapacity = v) } }
+    fun setWizRemaining(v: String) { _state.update { it.copy(wizRemaining = v) } }
+    fun setWizAbv(v: String) { _state.update { it.copy(wizAbv = v) } }
+
+    fun setWizOpenedState(s: OpenedState) {
+        _state.update { it.copy(wizOpenedState = s, wizOpenedDate = if (s == OpenedState.CUSTOM) (it.wizOpenedDate ?: System.currentTimeMillis()) else null) }
+    }
+
+    fun setWizOpenedDate(d: Long) { _state.update { it.copy(wizOpenedState = OpenedState.CUSTOM, wizOpenedDate = d) } }
+
+    fun wizBack() {
+        val st = _state.value
+        when {
+            st.wizStep == "confirm" -> {
+                /* 无品牌可选项的材料在向导里跳过了 brand 步，确认页要直接退回材料步 */
+                val skipBrand = st.wizBrands.size <= 1
+                _state.update { it.copy(wizStep = if (skipBrand) "ing" else "brand", wizBrand = null, wizBrandPicked = false) }
+            }
+            st.wizStep == "brand" -> _state.update { it.copy(wizStep = "ing", wizIng = null, wizBrands = emptyList()) }
+            st.wizStep == "ing" -> _state.update { it.copy(wizStep = "cat", wizCat = null) }
+            else -> _state.update { it.copy(mode = "entry", error = null) }
+        }
+    }
+
+    /* 向导确认入库：容量/剩余量/酒精度/开瓶状态以确认页编辑后的为准。
+       首次添加成功后写入 quickAddUsed，加酒页入口从此永久隐藏（本次向导会话可继续添加） */
+    fun wizSave() {
+        val st = _state.value
+        val ing = st.wizIng ?: return
+        if (!st.wizBrandPicked) return
+        val cap = st.wizCapacity.toDoubleOrNull()
+        val rem = st.wizRemaining.toDoubleOrNull()
+        val abv = st.wizAbv.toDoubleOrNull()
+        if (cap == null || cap <= 0) { _state.update { it.copy(error = "容量填一个大于 0 的数") }; return }
+        if (rem == null || rem < 0) { _state.update { it.copy(error = "剩余量填一个不小于 0 的数") }; return }
+        if (rem > cap) { _state.update { it.copy(error = "剩余量不能超过容量") }; return }
+        if (abv == null || abv < 0 || abv > 100) { _state.update { it.copy(error = "酒精度填一个 0 到 100 之间的数") }; return }
+        if (st.submitting) return
+        _state.update { it.copy(submitting = true, error = null) }
         viewModelScope.launch {
             try {
                 val before = okCount()
-                val cap = (brand?.capacityMl ?: if (ing.dimension == UnitDimension.COUNT) 6 else 750).toDouble()
+                val brand = st.wizBrand
                 cabinet.addBottle(
                     Bottle(
                         ingredientId = ing.id,
                         brand = brand?.brand ?: ing.zh,
-                        label = brand?.label ?: if (ing.isCustom) "自定义" else "",
+                        label = brand?.label ?: "",
                         shape = SHAPE_BY_CATEGORY[ing.category] ?: "spirit",
                         liquid = LIQUID_BY_CATEGORY[ing.category] ?: "oklch(0.7 0.08 80)",
                         initQty = Qty.round(cap),
-                        remaining = Qty.round(cap),
+                        remaining = Qty.round(rem),
                         unit = ing.unit,
-                        abv = brand?.abv ?: ing.defaultAbv,
-                        openedAt = null
+                        abv = abv,
+                        openedAt = if (ing.dimension == UnitDimension.VOLUME && abv > 0) st.wizOpenedState.toOpenedAt(st.wizOpenedDate) else null
                     ),
                     reason = "一键添加"
                 )
                 val gain = try { okCount() - before } catch (e: Exception) { 0 }
-                _state.update { it.copy(quickAddedMsg = "已添加 " + ing.zh + (if (gain > 0) " · 又能多调 " + gain + " 款" else "")) }
+                userPrefs.quickAddUsed = true
+                _state.update {
+                    it.copy(
+                        quickAddedMsg = "已添加 " + ing.basicName() + (if (gain > 0) " · 又能多调 " + gain + " 款" else ""),
+                        showQuickAdd = false,
+                        submitting = false,
+                        /* 向导里添加：回到第一步继续挑下一瓶 */
+                        wizStep = if (it.mode == "wizard") "cat" else it.wizStep,
+                        wizCat = null, wizIng = null, wizBrands = emptyList(), wizBrand = null, wizBrandPicked = false
+                    )
+                }
             } catch (e: Exception) {
-                _state.update { it.copy(error = "添加失败：" + (e.message ?: "原因不明，再试一次")) }
+                _state.update { it.copy(submitting = false, error = "添加失败：" + (e.message ?: "原因不明，再试一次")) }
             }
         }
     }
@@ -278,40 +420,161 @@ fun AddBottleScreen(nav: NavHostController, vm: AddBottleViewModel = hiltViewMod
         s.quickAddedMsg?.let { snackbarHostState.showSnackbar(it); vm.clearQuickAdded() }
     }
 
+    /* 页内返回：子页面（搜索/新建/确认/向导）先退回页内上一级，只在 entry 才真正退出页面 */
+    val goBack: () -> Unit = {
+        when {
+            s.mode == "wizard" -> vm.wizBack()
+            s.mode != "entry" -> vm.setMode("entry")
+            else -> nav.popBackStack()
+        }
+    }
+    BackHandler(enabled = s.mode != "entry") { goBack() }
+
     Scaffold(
         containerColor = Bg,
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = { AmberTopBar("添加酒瓶", onBack = { nav.popBackStack() }) }
+        topBar = { AmberTopBar("添加酒瓶", onBack = goBack) }
     ) { padding ->
         LazyColumn(Modifier.padding(padding).fillMaxSize(), contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp)) {
 
             if (s.mode == "entry") {
-                item {
-                    Text("常见酒一键添加", style = MaterialTheme.typography.titleLarge)
-                    Text("家里常备的这些，点一下就以满瓶放进酒柜", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp, bottom = 6.dp))
-                    s.popular.chunked(2).forEach { row ->
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            row.forEach { (ing, brand) ->
-                                val owned = ing.id in s.ownedIngredientIds
-                                Card(
-                                    onClick = { vm.quickAdd(ing, brand) },
-                                    enabled = !owned,
-                                    colors = CardDefaults.cardColors(containerColor = Surface),
-                                    modifier = Modifier.weight(1f).padding(vertical = 4.dp)
-                                ) {
-                                    Column(Modifier.padding(12.dp)) {
-                                        Text(ing.zh, fontSize = 13.sp, color = if (owned) Muted else Fg)
-                                        Text(if (owned) "已在柜中" else CATEGORY_ZH[ing.category] ?: ing.category, color = Muted, fontSize = 11.sp)
-                                    }
-                                }
-                            }
-                            if (row.size == 1) Spacer(Modifier.weight(1f))
-                        }
+                /* 一次性新手引导：用过一次后 showQuickAdd = false，这条入口永久消失 */
+                if (s.showQuickAdd) {
+                    item {
+                        Text("第一次来？先从常见材料开始", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 6.dp))
+                        EntryRow("常见材料快速添加", "按类型、材料、品牌一步步挑，容量、余量、酒精度都能在确认页改") { vm.startWizard() }
                     }
                 }
                 item {
                     EntryRow("从材料库里搜", "内置的中英文材料和常见品牌，别名也能搜到") { vm.setMode("search"); vm.setQuery("") }
                     EntryRow("库里没有？自己新建", "起个名字、选好分类和计量方式，就能放进酒柜") { vm.setMode("manual") }
+                }
+            }
+
+            if (s.mode == "wizard") {
+                item {
+                    val stepNo = when (s.wizStep) { "cat" -> 1; "ing" -> 2; "brand" -> 3; else -> 4 }
+                    val stepTitle = when (s.wizStep) { "cat" -> "选类型"; "ing" -> "选材料"; "brand" -> "选品牌"; else -> "确认添加" }
+                    Text("常见材料快速添加", style = MaterialTheme.typography.titleLarge)
+                    Text("第 " + stepNo + " / 4 步 · " + stepTitle, color = Accent, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp, bottom = 6.dp))
+                }
+                when (s.wizStep) {
+                    "cat" -> {
+                        items(s.popularCats, key = { it }) { cat ->
+                            val count = s.popular.count { it.first.category == cat }
+                            Card(
+                                onClick = { vm.wizPickCat(cat) },
+                                colors = CardDefaults.cardColors(containerColor = Surface),
+                                modifier = Modifier.fillMaxWidth().animateItem().padding(vertical = 4.dp)
+                            ) {
+                                Column(Modifier.padding(14.dp)) {
+                                    Text(CATEGORY_ZH[cat] ?: cat, fontSize = 14.sp, color = Fg)
+                                    Text(count.toString() + " 种常见材料", color = Muted, fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
+                    "ing" -> {
+                        val ings = s.popular.filter { it.first.category == s.wizCat }
+                        items(ings, key = { it.first.id }) { (ing, _) ->
+                            val owned = ing.id in s.ownedIngredientIds
+                            Card(
+                                onClick = { vm.wizPickIng(ing) },
+                                enabled = !owned,
+                                colors = CardDefaults.cardColors(containerColor = Surface),
+                                modifier = Modifier.fillMaxWidth().animateItem().padding(vertical = 4.dp)
+                            ) {
+                                Column(Modifier.padding(14.dp)) {
+                                    /* 只显示最基础的材料品类名（金酒而非伦敦干金酒），品牌在下一步单独选 */
+                                    Text(ing.basicName(), fontSize = 14.sp, color = if (owned) Muted else Fg)
+                                    if (owned) Text("已在柜中", color = Muted, fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
+                    "brand" -> {
+                        items(s.wizBrands, key = { it?.let { b -> b.brand + "|" + b.label } ?: "none" }) { brand ->
+                            Card(
+                                onClick = { vm.wizPickBrand(brand) },
+                                colors = CardDefaults.cardColors(containerColor = Surface),
+                                modifier = Modifier.fillMaxWidth().animateItem().padding(vertical = 4.dp)
+                            ) {
+                                Column(Modifier.padding(14.dp)) {
+                                    Text(brand?.brand ?: "未指定品牌", fontSize = 14.sp, color = Fg)
+                                    Text(
+                                        brand?.let { b ->
+                                            listOf(b.label, b.capacityMl.toString() + " ml", "酒精度 " + b.abv + "%")
+                                                .filter { it.isNotBlank() }.joinToString(" · ")
+                                        } ?: "按材料的默认容量和酒精度入库",
+                                        color = Muted, fontSize = 12.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    "confirm" -> {
+                        item {
+                            val ing = s.wizIng
+                            if (ing != null) {
+                                val brand = s.wizBrand
+                                InfoField("类型", CATEGORY_ZH[ing.category] ?: ing.category)
+                                InfoField("材料", ing.basicName())
+                                InfoField("品牌与酒款", brand?.let { it.brand + if (it.label.isBlank()) "" else " · " + it.label } ?: "未指定品牌")
+                                /* 容量 / 剩余量 / 酒精度 / 开瓶状态都按默认值预填，入库前可改 */
+                                OutlinedTextField(
+                                    value = s.wizCapacity, onValueChange = { vm.setWizCapacity(it) },
+                                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                                    label = { Text("这瓶一共多少（" + ing.unit + "）") },
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                    singleLine = true, shape = RoundedCornerShape(12.dp)
+                                )
+                                val capV = s.wizCapacity.toDoubleOrNull()
+                                val remV = s.wizRemaining.toDoubleOrNull()
+                                val remError = remV == null || remV < 0 || (capV != null && remV > capV)
+                                OutlinedTextField(
+                                    value = s.wizRemaining, onValueChange = { vm.setWizRemaining(it) },
+                                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                                    label = { Text("现在还剩多少（" + ing.unit + "，可以是 0）") },
+                                    isError = remError,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                    singleLine = true, shape = RoundedCornerShape(12.dp)
+                                )
+                                if (capV != null && capV > 0) {
+                                    /* 与搜索入库的确认页同一做法：滑块直接写数值字符串，显示处再格式化 */
+                                    Slider(
+                                        value = (remV ?: capV).toFloat().coerceIn(0f, capV.toFloat()),
+                                        onValueChange = { vm.setWizRemaining(kotlin.math.round(it).toInt().toString()) },
+                                        valueRange = 0f..capV.toFloat()
+                                    )
+                                }
+                                if (ing.dimension == UnitDimension.VOLUME) {
+                                    OutlinedTextField(
+                                        value = s.wizAbv, onValueChange = { vm.setWizAbv(it) },
+                                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                                        label = { Text("酒精度（%，不含酒精填 0）") },
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                        singleLine = true, shape = RoundedCornerShape(12.dp)
+                                    )
+                                    if ((s.wizAbv.toDoubleOrNull() ?: 0.0) > 0) {
+                                        OpenedStatePicker(s.wizOpenedState, s.wizOpenedDate, vm::setWizOpenedState, vm::setWizOpenedDate)
+                                    }
+                                }
+                                Button(
+                                    onClick = { vm.wizSave() },
+                                    enabled = s.wizBrandPicked && !remError && !s.submitting,
+                                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp).height(50.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = AccentInk),
+                                    shape = RoundedCornerShape(14.dp)
+                                ) { Text(if (s.submitting) "保存中…" else "放进酒柜") }
+                                Text("添加后会回到第一步，可以接着加下一瓶", color = Muted, fontSize = 11.sp, modifier = Modifier.padding(top = 8.dp))
+                            }
+                        }
+                    }
+                }
+                item {
+                    OutlinedButton(onClick = { vm.wizBack() }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                        Text(if (s.wizStep == "cat") "返回" else "上一步")
+                    }
                 }
             }
 
@@ -438,10 +701,7 @@ fun AddBottleScreen(nav: NavHostController, vm: AddBottleViewModel = hiltViewMod
                         )
                     }
                     if (ing.dimension == UnitDimension.VOLUME && ing.defaultAbv > 0) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            FilterChip(selected = !s.openedToday, onClick = { vm.setOpened(false) }, label = { Text("未开瓶") })
-                            FilterChip(selected = s.openedToday, onClick = { vm.setOpened(true) }, label = { Text("今天开瓶") })
-                        }
+                        OpenedStatePicker(s.openedState, s.openedDate, vm::setOpenedState, vm::setOpenedDate)
                     }
                     Button(
                         onClick = { vm.save() },
@@ -493,6 +753,52 @@ private fun InfoField(label: String, value: String) {
         Text(label, fontSize = 13.sp, color = Fg)
         Surface(color = Surface, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) {
             Text(value, Modifier.padding(12.dp), fontSize = 14.sp, color = Fg)
+        }
+    }
+}
+
+/* 开瓶状态三选一：未开瓶 / 今天开瓶 / 其他日期（选中后再挑具体哪一天）。
+   搜索入库确认页与常见材料向导确认页共用，避免两处文案与落库语义各写一套 */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun OpenedStatePicker(
+    state: OpenedState,
+    date: Long?,
+    onState: (OpenedState) -> Unit,
+    onDate: (Long) -> Unit
+) {
+    var showPicker by remember { mutableStateOf(false) }
+    /* SimpleDateFormat 非线程安全，在组合期建随屏幕销毁的实例 */
+    val dayFmt = rememberDateFmt("yyyy年M月d日")
+    Column {
+        Text("开瓶了吗", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 12.dp, bottom = 6.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(selected = state == OpenedState.UNOPENED, onClick = { onState(OpenedState.UNOPENED) }, label = { Text("未开瓶") })
+            FilterChip(selected = state == OpenedState.TODAY, onClick = { onState(OpenedState.TODAY) }, label = { Text("今天开瓶") })
+            FilterChip(
+                selected = state == OpenedState.CUSTOM,
+                onClick = { onState(OpenedState.CUSTOM); showPicker = true },
+                label = { Text("其他日期") }
+            )
+        }
+        if (state == OpenedState.CUSTOM) {
+            OutlinedButton(
+                onClick = { showPicker = true },
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("开瓶日期：" + (date?.let { dayFmt.format(Date(it)) } ?: "点我选择"), color = Fg)
+            }
+        }
+        if (showPicker) {
+            val dpState = rememberDatePickerState(initialSelectedDateMillis = date ?: System.currentTimeMillis())
+            DatePickerDialog(
+                onDismissRequest = { showPicker = false },
+                confirmButton = {
+                    TextButton(onClick = { dpState.selectedDateMillis?.let(onDate); showPicker = false }) { Text("就选这天", color = Accent) }
+                },
+                dismissButton = { TextButton(onClick = { showPicker = false }) { Text("取消") } }
+            ) { DatePicker(state = dpState) }
         }
     }
 }

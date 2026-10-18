@@ -19,7 +19,8 @@ ViewModel/Coroutines/Flow + Room + Hilt。
       data/
         db/         Room v4 实体 / DAO / 显式迁移（MIGRATION_1_2、MIGRATION_2_3、MIGRATION_3_4，无破坏性兜底）
         seed/       SeedCatalog：版本化 JSON 随包，加载即校验
-        prefs/      UserPrefs（SharedPreferences：最近备份时间、风味筛选触达标记）
+        prefs/      UserPrefs（SharedPreferences：最近备份时间、风味筛选触达标记、
+                    常见材料快速添加已用标记）
         repo/       Repository（扣减在 withTransaction 内执行）· BackupCodec（ZIP+校验，
                     纯 JVM 可测）· BackupRestore（全量替换）· BackupService（Android 文件层）
     ui/
@@ -36,7 +37,7 @@ ViewModel/Coroutines/Flow + Room + Hilt。
 | 系统配方 | **102 款**（全部为 IBA 官方现行配方，即 2024.11 版榜单三大组各 34 款；数据版本 2026.09.12-2） |
 | 材料 | 105 种 |
 | 替代规则 | 13 条（单层、有方向、含比例/风味影响/适用方法/优先级） |
-| 品牌记录 | 184 条（覆盖 95 种材料） |
+| 品牌记录 | 199 条（覆盖 95 种材料） |
 
 ✅ 配方集已对齐 IBA 官方现行榜单（2024.11 版，102 款：The Unforgettables / Contemporary
 Classics / New Era Drinks 各 34 款），与官方榜单一一对应。原规格 150 款目标经用户决策
@@ -54,7 +55,7 @@ Trinidad Sour 材料恢复为官方配方杏仁糖浆）。扩充时向 `assets/
 
 ## 测试
 
-`app/src/test/` 共 **64 个 JVM 用例，全部通过**：
+`app/src/test/` 共 **68 个 JVM 用例，全部通过**：
 
 - `EngineTest`（39）：状态四态与最大杯数、必需/可选/装饰/常备、单层替代（方向/方法过滤）、
   多瓶选择与跨瓶扣减、用户指定瓶优先扣减（含替代生效时仍按原材料 ID 取用户选的瓶）、
@@ -72,12 +73,13 @@ Trinidad Sour 材料恢复为官方配方杏仁糖浆）。扩充时向 `assets/
 - `BackupCodecTest`（15）：ZIP 往返、篡改/错误应用/新版本/悬空关联/非法单位/超范围数量/
   重复 ID/ZIP 路径穿越/缺少 kv 段拒绝、归档酒瓶备份自洽、照片随包、v1 旧格式兼容、摘要解析。
 - `TxSanityTest`：Room withTransaction 真实回滚健全性。
+- `OpenedStateTest`（4）：开瓶状态三态到 openedAt 的映射（未开瓶 / 今天开瓶 / 指定日期，缺日期回退未开瓶）。
 - `testdb/JdbcSQLiteOpenHelper`：以 sqlite-jdbc 驱动的真实 SQLite OpenHelper
   （含 Android 语义的嵌套事务栈），让 Room 测试无需模拟器。
 
 ## 构建
 
-    ./gradlew :app:testDebugUnitTest    # 64 个单元/数据库测试
+    ./gradlew :app:testDebugUnitTest    # 68 个单元/数据库测试
     ./gradlew :app:assembleDebug        # 可安装测试 APK（debug 签名）
     ./gradlew :app:assembleRelease      # 压缩优化的测试 APK（无发布签名时回退 debug 签名）
 

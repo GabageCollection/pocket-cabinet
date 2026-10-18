@@ -281,8 +281,22 @@ class CabinetRepository @Inject constructor(
     }
 
     /** 编辑酒瓶信息（品牌、酒款、容量、酒精度、开瓶日期、低库存阈值） */
-    suspend fun updateBottle(bottle: Bottle) =
-        bottleDao.upsert(bottle.toEntity().copy(updatedAt = System.currentTimeMillis()))
+    suspend fun updateBottle(bottle: Bottle) {
+        db.withTransaction {
+            val current = bottleDao.getById(bottle.id) ?: throw IllegalArgumentException("酒瓶不存在")
+            bottleDao.upsert(
+                current.copy(
+                    brand = bottle.brand,
+                    label = bottle.label,
+                    initQty = Qty.round(bottle.initQty),
+                    abv = bottle.abv,
+                    openedAt = bottle.openedAt,
+                    lowPct = bottle.lowPct,
+                    updatedAt = System.currentTimeMillis()
+                )
+            )
+        }
+    }
 
     /** 归档（软删除）：历史记录中的品牌/流水仍保留可查 */
     suspend fun archiveBottle(bottleId: String) {

@@ -16,4 +16,9 @@ class UserPrefs @Inject constructor(@ApplicationContext context: Context) {
     var flavorFilterTouched: Boolean
         get() = sp.getBoolean("flavor_filter_touched", false)
         set(value) { sp.edit().putBoolean("flavor_filter_touched", value).apply() }
+
+    /* 「常见酒一键添加」是一次性新手引导：成功添加过一瓶后置 true，入口永久消失 */
+    var quickAddUsed: Boolean
+        get() = sp.getBoolean("quick_add_used", false)
+        set(value) { sp.edit().putBoolean("quick_add_used", value).apply() }
 }

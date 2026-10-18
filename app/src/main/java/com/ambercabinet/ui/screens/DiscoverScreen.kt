@@ -73,6 +73,8 @@ data class DiscoverState(
     val pendingDraft: MixDraft? = null,
     val draftRecipeName: String = "",
     val recentMixes: List<String> = emptyList(),
+    /* 「常见酒一键添加」一次性引导还没用过才为 true，用过之后相关入口永久隐藏 */
+    val quickAddAvailable: Boolean = true,
     val loaded: Boolean = false,
     /* 顶栏全局搜索：query 非空时下面两个列表才有内容 */
     val searchQuery: String = "",
@@ -237,6 +239,8 @@ class DiscoverViewModel @Inject constructor(
             recentMixes = c.recentMixes,
             unlockVersion = uv,
             flavorAffinity = c.flavorAffinity,
+            /* combine 随库存变化重跑：一键添加成功后 bottles 发射新值，这里就能读到最新标记 */
+            quickAddAvailable = !userPrefs.quickAddUsed,
             loaded = true,
             searchQuery = rawQuery,
             searchRecipes = searchRecipes,
@@ -452,7 +456,7 @@ fun DiscoverScreen(nav: NavHostController, vm: DiscoverViewModel = hiltViewModel
                                     onClick = { nav.navigate(Routes.ADD_BOTTLE) },
                                     colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = AccentInk),
                                     shape = RoundedCornerShape(12.dp)
-                                ) { Text("一键添加常见酒") }
+                                ) { Text(if (s.quickAddAvailable) "快速添加常见材料" else "去添加酒瓶") }
                                 OutlinedButton(onClick = { nav.navigate(Routes.recipes()) }, shape = RoundedCornerShape(12.dp)) {
                                     Text("先逛逛酒谱")
                                 }
@@ -460,8 +464,8 @@ fun DiscoverScreen(nav: NavHostController, vm: DiscoverViewModel = hiltViewModel
                         }
                     }
                 }
-            } else if (s.loaded && s.bottleCount in 1..2) {
-                /* 刚起步的轻量提示：与空柜引导卡互斥（条件不重叠），不抢主视觉 */
+            } else if (s.loaded && s.bottleCount in 1..2 && s.quickAddAvailable) {
+                /* 刚起步的轻量提示：与空柜引导卡互斥（条件不重叠），不抢主视觉；一键添加用过即永久消失 */
                 item {
                     Card(colors = CardDefaults.cardColors(containerColor = Surface), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
                         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -470,7 +474,7 @@ fun DiscoverScreen(nav: NavHostController, vm: DiscoverViewModel = hiltViewModel
                                 Text("常见基酒和辅料补齐后，能调的款式会多不少。", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
                             }
                             TextButton(onClick = { nav.navigate(Routes.ADD_BOTTLE) }) {
-                                Text("常见酒一键补齐", color = Accent, fontSize = 13.sp)
+                                Text("快速补齐常见材料", color = Accent, fontSize = 13.sp)
                             }
                         }
                     }
